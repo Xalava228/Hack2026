@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #f4f5f7;
   --surface: #ffffff;
   --surface-soft: #f2f3f7;
@@ -48,12 +48,10 @@ img { max-width: 100%; display: block; }
   gap: 10px;
   font-weight: 800;
   letter-spacing: -0.01em;
+  color: #6a2cff;
 }
 .brand-mark {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  background: linear-gradient(140deg, var(--accent), var(--accent-warm));
+  display: none;
 }
 .top-nav {
   display: inline-flex;
