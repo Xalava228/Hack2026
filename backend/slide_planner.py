@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from .ai_client import AIClient
+from .sample_analyzer import SampleAnalysis, sample_outline_for_llm
 
 logger = logging.getLogger(__name__)
 
@@ -259,5 +260,146 @@ async def plan_presentation(
         subtitle=str(data.get("subtitle", "")).strip(),
         theme=str(data.get("theme", "")).strip() or "general",
         palette=_coerce_palette(data.get("palette")),
+        slides=slides,
+    )
+
+
+def _build_sample_prompt(
+    user_prompt: str,
+    sample: SampleAnalysis,
+    n_slides: int,
+    images_mode: ImagesMode,
+    language: str,
+    text_density: TextDensity | None = None,
+) -> str:
+    images_hint = (
+        "Для каждого контентного слайда придумай поле image_prompt — короткое описание "
+        "иллюстрации на английском языке (без текста на изображении), подходящей по смыслу."
+        if images_mode == "with-images"
+        else "Поле image_prompt оставляй пустой строкой."
+    )
+    density_label = text_density or sample.density
+    density_hint = {
+        "minimal": "минимум текста: 2–3 коротких буллета на слайде",
+        "balanced": "сбалансированный текст: 3–5 буллетов на слайде",
+        "detailed": "развёрнутый текст: 4–6 буллетов или абзац на 2–4 предложения",
+    }.get(density_label, "сбалансированный текст: 3–5 буллетов на слайде")
+
+    sample_json = sample_outline_for_llm(sample)
+
+    schema = {
+        "title": "string",
+        "subtitle": "string",
+        "theme": "string",
+        "palette": {
+            "primary": "#RRGGBB",
+            "accent": "#RRGGBB",
+            "background": "#RRGGBB",
+            "text": "#RRGGBB",
+            "muted": "#RRGGBB",
+        },
+        "slides": [
+            {
+                "kind": "title|content|two_column|section|conclusion",
+                "title": "string",
+                "subtitle": "string (опционально)",
+                "bullets": ["string", "..."],
+                "body": "string (опционально)",
+                "image_prompt": "string",
+                "notes": "string (опционально)",
+            }
+        ],
+    }
+
+    return f"""Тебе дан образец чужой презентации (структура + палитра + плотность текста).
+Создай НОВУЮ презентацию на тему пользователя в ПОХОЖЕМ стиле и с похожей структурой.
+
+Образец (JSON):
+{sample_json}
+
+Что нужно унаследовать от образца:
+- ту же или близкую цветовую палитру (используй palette из образца, можешь чуть-чуть откорректировать для гармонии);
+- тот же ритм слайдов (последовательность kind: title → ... → conclusion);
+- ту же плотность текста ({density_hint});
+- стиль заголовков (длина, тон, эмоциональность).
+
+Что менять:
+- содержание полностью переписать под новую тему пользователя;
+- бюджет: ровно {n_slides} слайдов;
+- язык контента — {language}.
+
+Тема пользователя: «{user_prompt}»
+
+{images_hint}
+
+Верни СТРОГО валидный JSON без markdown-обёртки следующей формы:
+{json.dumps(schema, ensure_ascii=False, indent=2)}
+"""
+
+
+async def plan_presentation_from_sample(
+    client: AIClient,
+    user_prompt: str,
+    sample: SampleAnalysis,
+    n_slides: int | None = None,
+    images_mode: ImagesMode = "with-images",
+    text_density: TextDensity | None = None,
+) -> PresentationPlan:
+    """Сгенерировать план в стиле образца."""
+    target_n = int(n_slides) if n_slides else sample.n_slides
+    target_n = max(3, min(target_n, 25))
+    language = _detect_language(user_prompt)
+
+    prompt = _build_sample_prompt(
+        user_prompt=user_prompt,
+        sample=sample,
+        n_slides=target_n,
+        images_mode=images_mode,
+        language=language,
+        text_density=text_density,
+    )
+
+    raw = await client.chat(
+        prompt,
+        system_prompt=(
+            "Ты возвращаешь СТРОГО валидный JSON без пояснений и без markdown-обёртки."
+        ),
+        max_new_tokens=4096,
+        temperature=0.5,
+    )
+
+    try:
+        data = _extract_json(raw)
+    except Exception:
+        logger.exception("LLM вернула невалидный JSON, делаю ретрай")
+        raw = await client.chat(
+            prompt + "\n\nВНИМАНИЕ: ответ должен быть только JSON.",
+            system_prompt="Возвращай только валидный JSON.",
+            max_new_tokens=4096,
+            temperature=0.2,
+        )
+        data = _extract_json(raw)
+
+    slides_raw = data.get("slides") or []
+    if not isinstance(slides_raw, list) or not slides_raw:
+        raise ValueError("LLM вернула пустой массив slides")
+
+    if len(slides_raw) > target_n:
+        slides_raw = slides_raw[:target_n]
+    slides = [_coerce_slide(s, i, len(slides_raw)) for i, s in enumerate(slides_raw)]
+
+    if images_mode == "no-images":
+        for s in slides:
+            s.image_prompt = ""
+
+    palette = _coerce_palette(data.get("palette")) or dict(sample.palette)
+    if not data.get("palette"):
+        palette = dict(sample.palette)
+
+    return PresentationPlan(
+        title=str(data.get("title", "")).strip() or sample.title_guess or "Без названия",
+        subtitle=str(data.get("subtitle", "")).strip(),
+        theme=str(data.get("theme", "")).strip() or "from_sample",
+        palette=palette,
         slides=slides,
     )

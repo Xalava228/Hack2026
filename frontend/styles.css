@@ -409,6 +409,187 @@ input[type="range"]::-moz-range-thumb {
 .error-card { border-color: rgba(239, 68, 68, 0.4); }
 .error-card h2 { color: #fca5a5; }
 
+.sample-card .card-head h2 { display: flex; align-items: center; gap: 10px; }
+.badge-soft {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.dropzone {
+  border: 2px dashed rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.04);
+  border-radius: 16px;
+  padding: 30px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.dropzone:hover {
+  border-color: rgba(139, 92, 246, 0.65);
+  background: rgba(139, 92, 246, 0.08);
+}
+.dropzone.drag {
+  border-color: var(--accent-2);
+  background: rgba(236, 72, 153, 0.10);
+  transform: scale(1.01);
+}
+.dz-icon { font-size: 32px; margin-bottom: 8px; }
+.dz-title { font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.dz-sub { color: var(--text-muted); font-size: 13px; }
+.dz-pick {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.sample-status {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sample-status.error {
+  background: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fecaca;
+}
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.sample-preview {
+  margin-top: 16px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+}
+.sp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.sp-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+  word-break: break-all;
+}
+.sp-remove {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  padding: 6px 12px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.sp-remove:hover { background: rgba(239, 68, 68, 0.18); }
+
+.sp-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.sp-stats span {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+.sp-stats b { color: var(--text); margin-right: 4px; font-weight: 600; }
+
+.sp-palette {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.sp-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  padding: 4px 10px 4px 4px;
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sp-color .swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.sp-outline {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.sp-outline summary {
+  cursor: pointer;
+  color: var(--accent);
+  user-select: none;
+  padding: 4px 0;
+}
+.sp-outline summary:hover { color: #c4b5fd; }
+.sp-outline-row {
+  display: flex;
+  gap: 10px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.sp-outline-row .num {
+  width: 24px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+.sp-outline-row .kind {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  width: 80px;
+}
+.sp-outline-row .ttl { flex: 1; color: var(--text); }
+
+.from-sample-mode #gen-card-sub::before {
+  content: "🎨 Режим «по образцу» включён · ";
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .hidden { display: none !important; }
 
 .how { margin: 50px 0; }

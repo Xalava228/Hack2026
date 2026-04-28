@@ -19,6 +19,19 @@
   const errorMsg = document.getElementById('error-msg');
   const retryBtn = document.getElementById('retry-btn');
 
+  const sampleCard = document.getElementById('sample-card');
+  const dropzone = document.getElementById('dropzone');
+  const sampleFile = document.getElementById('sample-file');
+  const sampleStatus = document.getElementById('sample-status');
+  const samplePreview = document.getElementById('sample-preview');
+  const spName = document.getElementById('sp-name');
+  const spStats = document.getElementById('sp-stats');
+  const spPalette = document.getElementById('sp-palette');
+  const spOutlineBody = document.getElementById('sp-outline-body');
+  const sampleRemoveBtn = document.getElementById('sample-remove');
+
+  let currentSample = null;
+
   slidesInput.addEventListener('input', () => {
     slidesVal.textContent = slidesInput.value;
   });
@@ -146,6 +159,135 @@
       .replace(/>/g, '&gt;');
   }
 
+  /* ---------------- Sample upload ---------------- */
+  function setSampleStatus(text, kind) {
+    sampleStatus.classList.remove('hidden', 'error');
+    if (kind === 'error') sampleStatus.classList.add('error');
+    sampleStatus.innerHTML = kind === 'loading'
+      ? `<span class="spinner"></span><span>${escapeHtml(text)}</span>`
+      : `<span>${escapeHtml(text)}</span>`;
+  }
+  function hideSampleStatus() { sampleStatus.classList.add('hidden'); }
+
+  function densityLabel(d) {
+    return { minimal: 'минимум текста', balanced: 'баланс', detailed: 'много текста' }[d] || d;
+  }
+
+  function renderSamplePreview(s) {
+    spName.textContent = `${s.file_name} · ${s.source_format.toUpperCase()}`;
+    spStats.innerHTML = `
+      <span><b>Слайдов:</b>${s.n_slides}</span>
+      <span><b>Плотность:</b>${densityLabel(s.density)}</span>
+      <span><b>Картинки:</b>${s.has_images ? 'да' : 'нет'}</span>
+      ${s.title_guess ? `<span><b>Тема:</b>${escapeHtml(s.title_guess.slice(0, 60))}</span>` : ''}
+    `;
+    spPalette.innerHTML = '';
+    Object.entries(s.palette || {}).forEach(([key, hex]) => {
+      const el = document.createElement('div');
+      el.className = 'sp-color';
+      el.innerHTML = `<span class="swatch" style="background:${escapeHtml(hex)}"></span><span>${key}</span><span style="color:var(--text)">${escapeHtml(hex)}</span>`;
+      spPalette.appendChild(el);
+    });
+    spOutlineBody.innerHTML = '';
+    (s.outline || []).forEach((row, i) => {
+      const el = document.createElement('div');
+      el.className = 'sp-outline-row';
+      el.innerHTML = `
+        <span class="num">${i + 1}.</span>
+        <span class="kind">${row.kind}</span>
+        <span class="ttl">${escapeHtml(row.title || '(без заголовка)')}</span>
+      `;
+      spOutlineBody.appendChild(el);
+    });
+    samplePreview.classList.remove('hidden');
+    document.body.classList.add('from-sample-mode');
+    if (slidesInput && Number(slidesInput.value) !== s.n_slides && s.n_slides >= 3 && s.n_slides <= 20) {
+      slidesInput.value = Math.max(3, Math.min(20, s.n_slides));
+      slidesVal.textContent = slidesInput.value;
+    }
+    if (s.density) {
+      const seg = document.querySelector('.seg[data-name="text_density"]');
+      if (seg) {
+        seg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        const target = seg.querySelector(`button[data-value="${s.density}"]`);
+        if (target) target.classList.add('active');
+      }
+    }
+  }
+
+  async function uploadSample(file) {
+    if (!file) return;
+    const okSuffix = /\.(pptx|pdf)$/i.test(file.name);
+    if (!okSuffix) {
+      setSampleStatus('Поддерживаются только .pptx и .pdf', 'error');
+      return;
+    }
+    if (file.size > 30 * 1024 * 1024) {
+      setSampleStatus('Файл больше 30 МБ — слишком тяжёлый', 'error');
+      return;
+    }
+    samplePreview.classList.add('hidden');
+    setSampleStatus(`Анализируем «${file.name}»…`, 'loading');
+
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await fetch('/api/analyze', { method: 'POST', body: fd });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(`Сервер вернул ${r.status}: ${text}`);
+      }
+      const data = await r.json();
+      currentSample = data;
+      hideSampleStatus();
+      renderSamplePreview(data);
+    } catch (err) {
+      setSampleStatus(err.message || String(err), 'error');
+      currentSample = null;
+    }
+  }
+
+  async function clearSample() {
+    if (currentSample?.sample_id) {
+      try {
+        await fetch(`/api/samples/${currentSample.sample_id}`, { method: 'DELETE' });
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    currentSample = null;
+    samplePreview.classList.add('hidden');
+    hideSampleStatus();
+    document.body.classList.remove('from-sample-mode');
+    sampleFile.value = '';
+  }
+
+  dropzone.addEventListener('click', () => sampleFile.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') sampleFile.click();
+  });
+  sampleFile.addEventListener('change', (e) => uploadSample(e.target.files?.[0]));
+
+  ['dragenter', 'dragover'].forEach(ev =>
+    dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.add('drag');
+    })
+  );
+  ['dragleave', 'dragend', 'drop'].forEach(ev =>
+    dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove('drag');
+    })
+  );
+  dropzone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer?.files?.[0];
+    if (file) uploadSample(file);
+  });
+  sampleRemoveBtn.addEventListener('click', clearSample);
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     hide(errorCard);
@@ -167,6 +309,10 @@
       image_backend: readSeg('image_backend'),
       output_format: readSeg('output_format'),
     };
+    if (currentSample?.sample_id) {
+      payload.sample_id = currentSample.sample_id;
+      progressTitle.textContent = 'Адаптируем стиль образца под вашу тему…';
+    }
 
     try {
       const r = await fetch('/api/generate', {

@@ -32,4 +32,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 ASSETS_DIR: Path = _ROOT / "assets"
 ASSETS_DIR.mkdir(exist_ok=True)
 
+UPLOADS_DIR: Path = _ROOT / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
+
 LLM_MODEL: str = os.environ.get("LLM_MODEL", "Qwen/Qwen2.5-72B-Instruct")

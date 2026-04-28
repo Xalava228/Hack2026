@@ -74,10 +74,41 @@
     </section>
 
     <section id="generator" class="generator">
+      <div class="card sample-card" id="sample-card">
+        <div class="card-head">
+          <h2>📎 По образцу <span class="badge-soft">опционально</span></h2>
+          <p>Загрузите готовую презентацию (PPTX или PDF) — ИИ проанализирует её структуру и палитру и создаст новую с похожим стилем.</p>
+        </div>
+
+        <div id="dropzone" class="dropzone">
+          <input type="file" id="sample-file" accept=".pptx,.pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf" hidden />
+          <div class="dz-inner">
+            <div class="dz-icon">⬆️</div>
+            <div class="dz-title">Перетащите PPTX или PDF сюда</div>
+            <div class="dz-sub">или <span class="dz-pick">выберите файл</span> · до 30 МБ</div>
+          </div>
+        </div>
+
+        <div id="sample-status" class="sample-status hidden"></div>
+
+        <div id="sample-preview" class="sample-preview hidden">
+          <div class="sp-row">
+            <div class="sp-name" id="sp-name">—</div>
+            <button type="button" class="sp-remove" id="sample-remove">Удалить образец ✕</button>
+          </div>
+          <div class="sp-stats" id="sp-stats"></div>
+          <div class="sp-palette" id="sp-palette"></div>
+          <details class="sp-outline">
+            <summary>Структура образца</summary>
+            <div id="sp-outline-body"></div>
+          </details>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <h2>Создать презентацию</h2>
-          <p>Опишите тему — остальное сделает ИИ.</p>
+          <p id="gen-card-sub">Опишите тему — остальное сделает ИИ.</p>
         </div>
 
         <form id="gen-form" class="form">

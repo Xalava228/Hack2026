@@ -20,11 +20,13 @@ from . import config
 from .ai_client import AIClient, ImageBackend
 from .pdf_builder import build_pdf
 from .pptx_builder import build_pptx
+from .sample_analyzer import SampleAnalysis
 from .slide_planner import (
     ImagesMode,
     PresentationPlan,
     TextDensity,
     plan_presentation,
+    plan_presentation_from_sample,
 )
 
 logger = logging.getLogger(__name__)
@@ -124,20 +126,36 @@ async def run_pipeline(
     images_mode: ImagesMode,
     output_format: OutputFormat,
     image_backend: ImageBackend = "yandex-art",
+    sample: SampleAnalysis | None = None,
 ) -> JobResult:
     """Полный пайплайн. Обновляет статус джобы по ходу."""
     state = JOBS[job_id]
     started = time.time()
     client = AIClient()
 
-    state.update("planning", 0.05, "Спрашиваем у LLM структуру презентации…")
-    plan = await plan_presentation(
-        client,
-        user_prompt=user_prompt,
-        n_slides=n_slides,
-        text_density=text_density,
-        images_mode=images_mode,
-    )
+    if sample is None:
+        state.update("planning", 0.05, "Спрашиваем у LLM структуру презентации…")
+        plan = await plan_presentation(
+            client,
+            user_prompt=user_prompt,
+            n_slides=n_slides,
+            text_density=text_density,
+            images_mode=images_mode,
+        )
+    else:
+        state.update(
+            "planning",
+            0.05,
+            f"Анализируем образец «{sample.file_name}» и адаптируем под вашу тему…",
+        )
+        plan = await plan_presentation_from_sample(
+            client,
+            user_prompt=user_prompt,
+            sample=sample,
+            n_slides=n_slides,
+            images_mode=images_mode,
+            text_density=text_density,
+        )
     state.update("planned", 0.25, f"Готов план «{plan.title}» на {len(plan.slides)} слайдов.")
 
     images: dict[int, bytes] = {}
