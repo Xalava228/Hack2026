@@ -193,6 +193,11 @@ class AIClient:
                     in (b"\x89PNG", b"\xff\xd8\xff\xe0", b"\xff\xd8\xff\xe1", b"GIF8")
                 ):
                     return r.content
+                # Для некоторых id сервис сразу отвечает 400/404: такой id уже не станет валидным.
+                if r.status_code in (400, 404):
+                    raise AIClientError(
+                        f"download invalid id={image_id}: HTTP {r.status_code} ({service_type})"
+                    )
                 logger.info(
                     "Изображение id=%s ещё не готово (status=%s, ctype=%s), попытка %d/%d",
                     image_id,
@@ -229,13 +234,22 @@ class AIClient:
         """Генерация + скачивание одним вызовом. Возвращает bytes картинки."""
         if backend == "internet":
             return await self.download_internet_image(prompt, aspect=aspect)
-        if backend == "yandex-art":
-            image_id = await self.yandex_art(prompt, aspect=aspect)
-            service_type = "yaArt"
-        else:
-            image_id = await self.stable_diffusion(prompt)
-            service_type = "sd"
-        return await self.download_image(image_id, service_type)
+        # ai.rt иногда возвращает id, который падает на /download c 400.
+        # Пробуем пересоздать картинку ещё раз, чтобы не терять слайд.
+        last_err: Exception | None = None
+        for _attempt in range(2):
+            try:
+                if backend == "yandex-art":
+                    image_id = await self.yandex_art(prompt, aspect=aspect)
+                    service_type = "yaArt"
+                else:
+                    image_id = await self.stable_diffusion(prompt)
+                    service_type = "sd"
+                return await self.download_image(image_id, service_type)
+            except AIClientError as e:
+                last_err = e
+                logger.warning("Retry image generation due to download/generation error: %s", e)
+        raise AIClientError(f"Не удалось сгенерировать изображение после повтора: {last_err}")
 
     async def download_internet_image(self, query: str, aspect: str = "16:9") -> bytes:
         """Скачать релевантное фото из открытых источников (без API-ключа)."""

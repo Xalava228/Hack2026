@@ -154,9 +154,32 @@ async def _generate_one_image(
             idx,
             timeout_sec,
         )
+        # Фолбэк: пытаемся взять релевантную картинку из интернета.
+        if backend != "internet":
+            try:
+                data = await asyncio.wait_for(
+                    client.generate_image(prompt, backend="internet", aspect=aspect),
+                    timeout=min(timeout_sec, 25.0),
+                )
+                if data:
+                    logger.info("Слайд %d: AI timeout, используем internet fallback", idx)
+                    return idx, data
+            except Exception:
+                logger.exception("Слайд %d: internet fallback after timeout also failed", idx)
         return idx, None
     except Exception:
         logger.exception("Не удалось сгенерировать картинку для слайда %d", idx)
+        if backend != "internet":
+            try:
+                data = await asyncio.wait_for(
+                    client.generate_image(prompt, backend="internet", aspect=aspect),
+                    timeout=min(timeout_sec, 25.0),
+                )
+                if data:
+                    logger.info("Слайд %d: AI error, используем internet fallback", idx)
+                    return idx, data
+            except Exception:
+                logger.exception("Слайд %d: internet fallback after AI error also failed", idx)
         return idx, None
 
 
