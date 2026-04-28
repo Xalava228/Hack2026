@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import random
 import uuid
+from urllib.parse import quote_plus
 from typing import Literal
 
 import httpx
@@ -13,7 +15,7 @@ from . import config
 
 logger = logging.getLogger(__name__)
 
-ImageBackend = Literal["yandex-art", "sd"]
+ImageBackend = Literal["yandex-art", "sd", "internet"]
 
 
 class AIClientError(RuntimeError):
@@ -221,6 +223,8 @@ class AIClient:
         aspect: str = "16:9",
     ) -> bytes:
         """Генерация + скачивание одним вызовом. Возвращает bytes картинки."""
+        if backend == "internet":
+            return await self.download_internet_image(prompt, aspect=aspect)
         if backend == "yandex-art":
             image_id = await self.yandex_art(prompt, aspect=aspect)
             service_type = "yaArt"
@@ -228,6 +232,57 @@ class AIClient:
             image_id = await self.stable_diffusion(prompt)
             service_type = "sd"
         return await self.download_image(image_id, service_type)
+
+    async def download_internet_image(self, query: str, aspect: str = "16:9") -> bytes:
+        """Скачать фото из открытых источников (без API-ключа)."""
+        q = quote_plus((query or "technology presentation").strip())
+        w, h = (1600, 900) if aspect == "16:9" else (1200, 1200)
+        seed = hashlib.sha1(q.encode("utf-8")).hexdigest()[:12]
+        urls = [
+            f"https://picsum.photos/seed/{seed}/{w}/{h}",
+            f"https://loremflickr.com/{w}/{h}/{q}",
+        ]
+        last_err = ""
+        for url in urls:
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as cli:
+                    r = await cli.get(url, headers={"User-Agent": "SlideForge/1.0"})
+                ctype = r.headers.get("content-type", "")
+                if r.status_code == 200 and ctype.startswith("image/") and len(r.content) > 1024:
+                    return r.content
+                last_err = f"{url} status={r.status_code} ctype={ctype}"
+            except Exception as e:
+                last_err = f"{url} error={e}"
+        raise AIClientError(f"Не удалось получить интернет-изображение: {last_err}")
+
+    async def internet_image_candidates(self, query: str, count: int = 6, aspect: str = "16:9") -> list[bytes]:
+        q = (query or "technology presentation").strip()
+        count = max(1, min(int(count), 12))
+        w, h = (1600, 900) if aspect == "16:9" else (1200, 1200)
+        out: list[bytes] = []
+        seen: set[str] = set()
+        base_seeds = [hashlib.sha1(f"{q}-{i}".encode("utf-8")).hexdigest()[:12] for i in range(count * 2)]
+        urls: list[str] = []
+        for seed in base_seeds:
+            urls.append(f"https://picsum.photos/seed/{seed}/{w}/{h}")
+            urls.append(f"https://loremflickr.com/{w}/{h}/{quote_plus(q)}?lock={seed}")
+        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as cli:
+            for url in urls:
+                if len(out) >= count:
+                    break
+                try:
+                    r = await cli.get(url, headers={"User-Agent": "SlideForge/1.0"})
+                    ctype = r.headers.get("content-type", "")
+                    if r.status_code != 200 or not ctype.startswith("image/") or len(r.content) < 1024:
+                        continue
+                    dig = hashlib.sha1(r.content).hexdigest()
+                    if dig in seen:
+                        continue
+                    seen.add(dig)
+                    out.append(r.content)
+                except Exception:
+                    continue
+        return out
 
 
 # ----------------- helpers -----------------

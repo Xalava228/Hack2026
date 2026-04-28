@@ -39,6 +39,8 @@ Optional:
 
 - `PYTHONUNBUFFERED=1`
 - `PYTHON_VERSION=3.11.11` (recommended to force stable build environment)
+- `IMAGE_CONCURRENCY=2` (stabilizes image generation on Render)
+- `IMAGE_TIMEOUT_SEC=75` (prevents jobs from hanging too long on a single image)
 
 ## 5) Persistent data (optional)
 

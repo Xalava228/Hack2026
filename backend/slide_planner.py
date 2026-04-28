@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 TextDensity = Literal["minimal", "balanced", "detailed"]
-ImagesMode = Literal["with-images", "no-images"]
+ImagesMode = Literal["with-images", "no-images", "internet-images"]
 SlideKind = Literal["title", "content", "two_column", "section", "conclusion", "table"]
 
 
@@ -197,12 +197,13 @@ def _build_prompt(
     language: str,
     *,
     preset_label: str = "",
+    web_context: str = "",
 ) -> str:
     density_block = _density_block(text_density)
     images_hint = (
         "Для каждого контентного слайда придумай поле image_prompt — короткое описание "
         "иллюстрации на английском языке (без текста на изображении), подходящей по смыслу."
-        if images_mode == "with-images"
+        if images_mode in ("with-images", "internet-images")
         else "Поле image_prompt оставляй пустой строкой — изображения не нужны."
     )
 
@@ -248,6 +249,7 @@ def _build_prompt(
 - Изображения: {images_hint}
 - Язык контента: {language}
 - Визуальный пресет дизайна (выбран пользователем, цвета в экспорте применятся к пресету): {preset_label or "по умолчанию"}
+{web_context if web_context else ""}
 
 Требования:
 1. Первый слайд — kind="title" (заголовок + подзаголовок).
@@ -470,6 +472,7 @@ async def plan_presentation(
     images_mode: ImagesMode = "with-images",
     self_check: bool = True,
     design_preset: str = DEFAULT_PRESET,
+    web_context: str = "",
 ) -> PresentationPlan:
     """Сгенерировать план презентации через LLM."""
     n_slides = max(3, min(int(n_slides), 25))
@@ -477,7 +480,7 @@ async def plan_presentation(
     dp = canonical_preset_id(design_preset)
     preset_label = PRESET_LABELS_RU.get(dp, dp)
     prompt = _build_prompt(
-        user_prompt, n_slides, text_density, images_mode, language, preset_label=preset_label
+        user_prompt, n_slides, text_density, images_mode, language, preset_label=preset_label, web_context=web_context
     )
 
     raw = await client.chat(
@@ -548,11 +551,12 @@ def _build_sample_prompt(
     text_density: TextDensity | None = None,
     *,
     preset_label: str = "",
+    web_context: str = "",
 ) -> str:
     images_hint = (
         "Для каждого контентного слайда придумай поле image_prompt — короткое описание "
         "иллюстрации на английском языке (без текста на изображении), подходящей по смыслу."
-        if images_mode == "with-images"
+        if images_mode in ("with-images", "internet-images")
         else "Поле image_prompt оставляй пустой строкой."
     )
     density_label: TextDensity = text_density or sample.density  # type: ignore[assignment]
@@ -615,6 +619,7 @@ def _build_sample_prompt(
   чисел (лучше пусто, чем неправда).
 
 Тема пользователя: «{user_prompt}»
+{web_context if web_context else ""}
 
 Выбранный визуальный пресент оформления (финальные цвета в экспорте): {preset_label or "по умолчанию"}
 
@@ -634,6 +639,7 @@ async def plan_presentation_from_sample(
     text_density: TextDensity | None = None,
     self_check: bool = True,
     design_preset: str = DEFAULT_PRESET,
+    web_context: str = "",
 ) -> PresentationPlan:
     """Сгенерировать план в стиле образца."""
     target_n = int(n_slides) if n_slides else sample.n_slides
@@ -650,6 +656,7 @@ async def plan_presentation_from_sample(
         language=language,
         text_density=text_density,
         preset_label=preset_label,
+        web_context=web_context,
     )
 
     raw = await client.chat(

@@ -36,3 +36,7 @@ UPLOADS_DIR: Path = _ROOT / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
 LLM_MODEL: str = os.environ.get("LLM_MODEL", "Qwen/Qwen2.5-72B-Instruct")
+
+# Защита пайплайна рендера от "зависания" на генерации изображений
+IMAGE_CONCURRENCY: int = max(1, min(int(os.environ.get("IMAGE_CONCURRENCY", "2")), 6))
+IMAGE_TIMEOUT_SEC: float = max(10.0, float(os.environ.get("IMAGE_TIMEOUT_SEC", "75")))

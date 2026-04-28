@@ -116,6 +116,7 @@
       n_slides: Math.max(3, Math.min(20, Number(slidesEl.value) || 10)),
       text_density: window.SF.parseSeg('text_density'),
       images_mode: window.SF.parseSeg('images_mode'),
+      research_mode: window.SF.parseSeg('research_mode') || 'off',
       image_backend: window.SF.parseSeg('image_backend'),
       output_format: window.SF.parseSeg('output_format'),
       design_preset: (document.getElementById('design_preset') || {}).value || 'fresh',

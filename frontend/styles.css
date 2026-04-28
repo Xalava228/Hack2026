@@ -192,8 +192,8 @@ input[type="text"]:focus,
 input[type="number"]:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid #d2e1ff;
-  border-color: #9ebaf0;
+  outline: 2px solid rgba(125, 51, 255, 0.2);
+  border-color: rgba(116, 35, 255, 0.4);
 }
 
 .seg {
@@ -320,8 +320,8 @@ textarea:focus {
   align-items: start;
 }
 .slide-nav {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(116, 35, 255, 0.1), rgba(255, 91, 31, 0.06));
+  border: 1px solid rgba(116, 35, 255, 0.2);
   border-radius: 14px;
   padding: 10px;
   box-shadow: var(--shadow);
@@ -340,15 +340,15 @@ textarea:focus {
   gap: 8px;
 }
 .slide-chip {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(116, 35, 255, 0.2);
   border-radius: 9px;
   padding: 8px;
-  background: #f8fbff;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.85), rgba(125, 51, 255, 0.06));
   cursor: pointer;
 }
 .slide-chip.active {
-  border-color: #9ebaf0;
-  background: #eaf3ff;
+  border-color: rgba(116, 35, 255, 0.45);
+  background: linear-gradient(120deg, rgba(125, 51, 255, 0.15), rgba(255, 91, 31, 0.1));
 }
 .slide-chip b {
   display: block;
@@ -441,7 +441,11 @@ textarea:focus {
   color: var(--muted);
   font-size: 13px;
 }
-.step-list div.active { background: #eaf3ff; border-color: #9ebaf0; color: #21418f; }
+.step-list div.active {
+  background: linear-gradient(120deg, rgba(125, 51, 255, 0.12), rgba(255, 91, 31, 0.08));
+  border-color: rgba(116, 35, 255, 0.35);
+  color: #4b2cb5;
+}
 .step-list div.done { background: #eefbf4; border-color: #b4e7ca; color: #1f8554; }
 
 .result-links {
@@ -574,8 +578,8 @@ textarea:focus {
 }
 
 .placement-btns .placement-btn.active {
-  border-color: #7aa7f2;
-  background: #e9f1ff;
+  border-color: rgba(116, 35, 255, 0.45);
+  background: linear-gradient(120deg, rgba(125, 51, 255, 0.12), rgba(255, 91, 31, 0.08));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
@@ -616,7 +620,7 @@ textarea:focus {
 }
 
 .engage-card {
-  border: 1px solid #dbe5f7;
+  border: 1px solid rgba(116, 35, 255, 0.2);
   border-radius: 10px;
   padding: 8px;
   font-size: 12px;
@@ -624,6 +628,34 @@ textarea:focus {
 
 .engage-card .risk {
   font-weight: 800;
+}
+
+.web-image-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.web-image-item {
+  border: 1px solid rgba(116, 35, 255, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  cursor: pointer;
+}
+
+.web-image-item img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  display: block;
+}
+
+.web-image-item .cap {
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #435273;
 }
 
 .risk-critical { color: #b42318; }
@@ -644,9 +676,9 @@ textarea:focus {
 }
 
 .active-slide-badge {
-  border: 1px solid #bfd2f5;
-  background: #edf4ff;
-  color: #29539f;
+  border: 1px solid rgba(125, 51, 255, 0.26);
+  background: linear-gradient(120deg, rgba(125, 51, 255, 0.1), rgba(255, 91, 31, 0.08));
+  color: #4b2cb5;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
@@ -658,12 +690,12 @@ textarea:focus {
 }
 
 .active-slide-badge strong {
-  color: #1e3d7c;
+  color: #5e2cff;
 }
 
 .slide-stage-wrap {
-  background: #dbe9ff;
-  border: 1px solid #c1d6fa;
+  background: linear-gradient(135deg, rgba(116, 35, 255, 0.1), rgba(255, 91, 31, 0.06));
+  border: 1px solid rgba(116, 35, 255, 0.2);
   border-radius: 16px;
   padding: 18px;
 }
@@ -679,10 +711,10 @@ textarea:focus {
 }
 
 .deck-slide-wrap {
-  border: 1px solid #c5d8fb;
+  border: 1px solid rgba(116, 35, 255, 0.2);
   border-radius: 14px;
   padding: 0;
-  background: transparent;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2));
 }
 
 .deck-slide-wrap.single {
@@ -702,9 +734,9 @@ textarea:focus {
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 18px;
-  border: 2px solid #6f9cef;
+  border: 2px solid rgba(116, 35, 255, 0.45);
   background: var(--p-bg);
-  box-shadow: 0 6px 0 rgba(46, 90, 181, 0.15);
+  box-shadow: 0 6px 16px rgba(76, 35, 163, 0.12);
   overflow: hidden;
 }
 
@@ -1062,7 +1094,7 @@ textarea:focus {
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  background: linear-gradient(150deg, #edf4ff 0%, #d3e6ff 100%);
+  background: linear-gradient(120deg, rgba(125, 51, 255, 0.12), rgba(255, 91, 31, 0.08));
   min-height: 0;
 }
 
@@ -1085,7 +1117,7 @@ textarea:focus {
   place-content: center;
   padding: 12px;
   text-align: center;
-  color: #3f5782;
+  color: #5b4f86;
   font-size: 13px;
 }
 
@@ -1109,12 +1141,12 @@ textarea:focus {
 }
 
 .editable:hover {
-  background: rgba(73, 113, 204, 0.08);
+  background: linear-gradient(120deg, rgba(125, 51, 255, 0.08), rgba(255, 91, 31, 0.06));
 }
 
 .editable:focus {
-  background: #f3f8ff;
-  box-shadow: 0 0 0 2px rgba(92, 137, 230, 0.55);
+  background: linear-gradient(120deg, rgba(125, 51, 255, 0.1), rgba(255, 91, 31, 0.08));
+  box-shadow: 0 0 0 2px rgba(125, 51, 255, 0.28);
 }
 
 .editable[data-placeholder]:empty::before {
@@ -1142,9 +1174,9 @@ textarea:focus {
   position: relative;
   height: 92px;
   border-radius: 8px;
-  border: 1px solid #d3e2fb;
+  border: 1px solid rgba(116, 35, 255, 0.24);
   overflow: hidden;
-  background: linear-gradient(140deg, #f6f9ff 0%, #e8f1ff 100%);
+  background: linear-gradient(140deg, rgba(125, 51, 255, 0.14), rgba(255, 91, 31, 0.1));
 }
 
 .chip-thumb img {
@@ -1168,7 +1200,7 @@ textarea:focus {
   padding: 2px 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.9);
-  color: #2d4886;
+  color: #5131b4;
   font-size: 11px;
   font-weight: 700;
 }
@@ -1188,6 +1220,9 @@ textarea:focus {
 @media (max-width: 1020px) {
   .engage-list {
     grid-template-columns: 1fr;
+  }
+  .web-image-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .content-body-row.with-image {

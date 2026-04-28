@@ -31,10 +31,12 @@ from .slide_planner import (
     plan_presentation,
     plan_presentation_from_sample,
 )
+from .web_research import collect_web_context
 
 logger = logging.getLogger(__name__)
 
 OutputFormat = Literal["pptx", "pdf", "both"]
+ResearchMode = Literal["off", "web"]
 ProgressCallback = Callable[[str, float, str], None]
 
 
@@ -126,10 +128,21 @@ async def _generate_one_image(
     prompt: str,
     backend: ImageBackend,
     aspect: str,
+    timeout_sec: float,
 ) -> tuple[int, bytes | None]:
     try:
-        data = await client.generate_image(prompt, backend=backend, aspect=aspect)
+        data = await asyncio.wait_for(
+            client.generate_image(prompt, backend=backend, aspect=aspect),
+            timeout=timeout_sec,
+        )
         return idx, data
+    except TimeoutError:
+        logger.warning(
+            "Таймаут генерации картинки для слайда %d (%.0fs), пропускаем",
+            idx,
+            timeout_sec,
+        )
+        return idx, None
     except Exception:
         logger.exception("Не удалось сгенерировать картинку для слайда %d", idx)
         return idx, None
@@ -146,11 +159,21 @@ async def run_pipeline(
     image_backend: ImageBackend = "yandex-art",
     sample: SampleAnalysis | None = None,
     design_preset: str = "fresh",
+    research_mode: ResearchMode = "off",
 ) -> JobResult:
     """Полный пайплайн. Обновляет статус джобы по ходу."""
     state = JOBS[job_id]
     started = time.time()
     client = AIClient()
+
+    web_context = ""
+    if research_mode == "web":
+        state.update("planning", 0.03, "Собираем справку из интернета по теме…")
+        try:
+            web_context = await collect_web_context(user_prompt)
+        except Exception:
+            logger.exception("Web research failed; continuing without context")
+            web_context = ""
 
     if sample is None:
         state.update(
@@ -165,6 +188,7 @@ async def run_pipeline(
             text_density=text_density,
             images_mode=images_mode,
             design_preset=design_preset,
+            web_context=web_context,
         )
     else:
         state.update(
@@ -180,11 +204,12 @@ async def run_pipeline(
             images_mode=images_mode,
             text_density=text_density,
             design_preset=design_preset,
+            web_context=web_context,
         )
     state.update("planned", 0.25, f"Готов план «{plan.title}» на {len(plan.slides)} слайдов.")
 
     images: dict[int, bytes] = {}
-    if images_mode == "with-images":
+    if images_mode in ("with-images", "internet-images"):
         prompt_targets = [
             (i, s.image_prompt)
             for i, s in enumerate(plan.slides)
@@ -194,14 +219,14 @@ async def run_pipeline(
             state.update(
                 "images",
                 0.30,
-                f"Генерируем {len(prompt_targets)} изображений (Yandex ART)…",
+                f"Генерируем {len(prompt_targets)} изображений…",
             )
-            sem = asyncio.Semaphore(3)
+            sem = asyncio.Semaphore(config.IMAGE_CONCURRENCY)
 
             async def _bound(i: int, p: str) -> tuple[int, bytes | None]:
                 async with sem:
                     return await _generate_one_image(
-                        client, i, p, image_backend, "16:9"
+                        client, i, p, image_backend, "16:9", config.IMAGE_TIMEOUT_SEC
                     )
 
             tasks = [asyncio.create_task(_bound(i, p)) for i, p in prompt_targets]
@@ -266,7 +291,7 @@ async def run_render_pipeline(
         custom = _decode_image_data_url(s.image_data_url)
         if custom:
             images[i] = custom
-    if images_mode == "with-images":
+    if images_mode in ("with-images", "internet-images"):
         prompt_targets = [
             (i, s.image_prompt)
             for i, s in enumerate(plan.slides)
@@ -274,11 +299,13 @@ async def run_render_pipeline(
         ]
         if prompt_targets:
             state.update("images", 0.30, f"Генерируем {len(prompt_targets)} изображений…")
-            sem = asyncio.Semaphore(3)
+            sem = asyncio.Semaphore(config.IMAGE_CONCURRENCY)
 
             async def _bound(i: int, p: str) -> tuple[int, bytes | None]:
                 async with sem:
-                    return await _generate_one_image(client, i, p, image_backend, "16:9")
+                    return await _generate_one_image(
+                        client, i, p, image_backend, "16:9", config.IMAGE_TIMEOUT_SEC
+                    )
 
             tasks = [asyncio.create_task(_bound(i, p)) for i, p in prompt_targets]
             done = 0

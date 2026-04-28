@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from .slide_planner import (
     plan_presentation_from_sample,
     regenerate_slide,
 )
+from .web_research import collect_web_context
 
 SAMPLES: dict[str, SampleAnalysis] = {}
 
@@ -48,9 +50,10 @@ class GenerateRequest(BaseModel):
     prompt: str = Field(..., min_length=3, max_length=2000)
     n_slides: int = Field(8, ge=3, le=25)
     text_density: str = Field("balanced", pattern="^(minimal|balanced|detailed)$")
-    images_mode: str = Field("with-images", pattern="^(with-images|no-images)$")
+    images_mode: str = Field("with-images", pattern="^(with-images|no-images|internet-images)$")
     output_format: str = Field("both", pattern="^(pptx|pdf|both)$")
-    image_backend: str = Field("yandex-art", pattern="^(yandex-art|sd)$")
+    image_backend: str = Field("yandex-art", pattern="^(yandex-art|sd|internet)$")
+    research_mode: str = Field("off", pattern="^(off|web)$")
     sample_id: str | None = None
     design_preset: str = Field(
         "fresh",
@@ -64,20 +67,26 @@ class PlanRequest(GenerateRequest):
 
 class RenderRequest(BaseModel):
     plan: dict
-    images_mode: str = Field("with-images", pattern="^(with-images|no-images)$")
+    images_mode: str = Field("with-images", pattern="^(with-images|no-images|internet-images)$")
     output_format: str = Field("both", pattern="^(pptx|pdf|both)$")
-    image_backend: str = Field("yandex-art", pattern="^(yandex-art|sd)$")
+    image_backend: str = Field("yandex-art", pattern="^(yandex-art|sd|internet)$")
 
 
 class RegenerateSlideRequest(BaseModel):
     plan: dict
     slide_index: int = Field(..., ge=0, le=100)
     instruction: str = Field(..., min_length=3, max_length=1200)
-    images_mode: str = Field("with-images", pattern="^(with-images|no-images)$")
+    images_mode: str = Field("with-images", pattern="^(with-images|no-images|internet-images)$")
 
 
 class EngagementRequest(BaseModel):
     plan: dict
+
+
+class WebImagesRequest(BaseModel):
+    query: str = Field(..., min_length=2, max_length=300)
+    count: int = Field(6, ge=1, le=12)
+    aspect: str = Field("16:9", pattern="^(16:9|1:1)$")
 
 
 _ALLOWED_SUFFIX = {".pptx", ".pdf"}
@@ -154,6 +163,7 @@ async def api_generate(req: GenerateRequest):
             image_backend=req.image_backend,  # type: ignore[arg-type]
             sample=sample,
             design_preset=req.design_preset,
+            research_mode=req.research_mode,  # type: ignore[arg-type]
         )
     )
     return {"job_id": job_id}
@@ -168,6 +178,13 @@ async def api_plan(req: PlanRequest):
             raise HTTPException(status_code=404, detail="sample_id не найден")
     try:
         client = AIClient()
+        web_context = ""
+        if req.research_mode == "web":
+            try:
+                web_context = await collect_web_context(req.prompt)
+            except Exception:
+                logger.exception("collect_web_context failed, continue without web context")
+                web_context = ""
         if sample is None:
             plan = await plan_presentation(
                 client,
@@ -176,6 +193,7 @@ async def api_plan(req: PlanRequest):
                 text_density=req.text_density,  # type: ignore[arg-type]
                 images_mode=req.images_mode,  # type: ignore[arg-type]
                 design_preset=req.design_preset,
+                web_context=web_context,
             )
         else:
             plan = await plan_presentation_from_sample(
@@ -186,6 +204,7 @@ async def api_plan(req: PlanRequest):
                 images_mode=req.images_mode,  # type: ignore[arg-type]
                 text_density=req.text_density,  # type: ignore[arg-type]
                 design_preset=req.design_preset,
+                web_context=web_context,
             )
     except AIClientError as e:
         logger.warning("api_plan: AI unavailable: %s", e)
@@ -255,6 +274,17 @@ async def api_engagement_heatmap(req: EngagementRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"invalid plan: {e}")
     return analyze_plan_engagement(plan)
+
+
+@app.post("/api/web-images")
+async def api_web_images(req: WebImagesRequest):
+    client = AIClient()
+    images = await client.internet_image_candidates(req.query, count=req.count, aspect=req.aspect)
+    encoded = [
+        f"data:image/jpeg;base64,{base64.b64encode(img).decode('ascii')}"
+        for img in images
+    ]
+    return {"query": req.query, "items": encoded}
 
 
 @app.get("/api/jobs/{job_id}")

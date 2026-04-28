@@ -43,6 +43,11 @@
   const engageScoreEl = document.getElementById('engage-score');
   const engageSummaryEl = document.getElementById('engage-summary');
   const engageListEl = document.getElementById('engage-list');
+  const webImagePanelEl = document.getElementById('web-image-panel');
+  const webImageQueryEl = document.getElementById('web-image-query');
+  const webImageStatusEl = document.getElementById('web-image-status');
+  const webImageSearchBtn = document.getElementById('web-image-search');
+  const webImageGridEl = document.getElementById('web-image-grid');
 
   const regenInstructionEl = document.getElementById('regen-instruction');
   const regenStatusEl = document.getElementById('regen-status');
@@ -257,6 +262,17 @@
       `;
       engageListEl.appendChild(card);
     });
+  }
+
+  function renderWebImagePanel() {
+    if (!webImagePanelEl || !webImageGridEl) return;
+    const s = currentSlide();
+    const canUse = s && (s.kind === 'content' || s.kind === 'two_column');
+    webImagePanelEl.classList.toggle('hide', !canUse);
+    if (!canUse) return;
+    if (webImageQueryEl && !webImageQueryEl.value.trim()) {
+      webImageQueryEl.value = s.image_prompt || s.title || '';
+    }
   }
 
   function refreshHeader() {
@@ -636,6 +652,7 @@
     refreshKindControl();
     refreshDesignToolbar();
     renderEngagementPanel();
+    renderWebImagePanel();
     renderSlideList();
     renderActiveSlide();
   }
@@ -789,6 +806,43 @@
       render();
     };
     reader.readAsDataURL(file);
+  });
+
+  webImageSearchBtn?.addEventListener('click', async () => {
+    if (!ensureState()) return;
+    const slide = currentSlide();
+    if (!(slide.kind === 'content' || slide.kind === 'two_column')) return;
+    const query = (webImageQueryEl?.value || '').trim() || slide.image_prompt || slide.title || '';
+    if (!query) return;
+    webImageSearchBtn.disabled = true;
+    if (webImageStatusEl) webImageStatusEl.textContent = 'Ищем картинки...';
+    if (webImageGridEl) webImageGridEl.innerHTML = '';
+    try {
+      const data = await window.SF.apiJson('/api/web-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, count: 6, aspect: '16:9' }),
+      });
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (webImageStatusEl) webImageStatusEl.textContent = `Найдено: ${items.length}`;
+      items.forEach((src, idx) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'web-image-item';
+        b.innerHTML = `<img src="${src}" alt="web-${idx}" /><div class="cap">Выбрать</div>`;
+        b.addEventListener('click', () => {
+          slide.image_data_url = src;
+          slide.image_prompt = query;
+          persist();
+          render();
+        });
+        webImageGridEl?.appendChild(b);
+      });
+    } catch (e) {
+      if (webImageStatusEl) webImageStatusEl.textContent = e.message || String(e);
+    } finally {
+      webImageSearchBtn.disabled = false;
+    }
   });
 
   engageBtn?.addEventListener('click', async () => {
