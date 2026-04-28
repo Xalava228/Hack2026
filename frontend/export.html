@@ -9,20 +9,32 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
-  <header class="site-header">
-    <div class="container header-row">
+<body class="rt-page">
+  <header class="rt-header">
+    <div class="rt-wrap rt-topline">
       <div class="brand"><span class="brand-mark"></span><span>SlideForge Telecom</span></div>
       <nav class="top-nav">
         <a href="/">Главная</a>
         <a href="/create.html">Создание</a>
         <a href="/editor.html">Редактор</a>
       </nav>
-      <a class="header-cta" href="/create.html">Новый проект</a>
+      <div class="rt-top-actions">
+        <a href="/editor.html">Редактор</a>
+        <button class="rt-login" onclick="location.href='/create.html'">Создать презентацию</button>
+      </div>
+    </div>
+    <div class="rt-wrap rt-main-nav-row">
+      <nav class="rt-main-nav">
+        <a href="/">Главная</a>
+        <a href="/create.html">Создание</a>
+        <a href="/editor.html">Редактор</a>
+        <a href="/export.html">Экспорт</a>
+      </nav>
+      <div class="rt-city">16:9</div>
     </div>
   </header>
 
-  <main class="page container">
+  <main class="rt-wrap rt-main">
     <section class="panel">
       <div class="panel-head">
         <div>
