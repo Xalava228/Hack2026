@@ -1,0 +1,100 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SlideForge AI - Визуальный редактор</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-row">
+      <div class="brand"><span class="brand-mark"></span><span>SlideForge Telecom</span></div>
+      <nav class="top-nav">
+        <a href="/">Главная</a>
+        <a href="/create.html">Создание</a>
+        <a href="/editor.html">Редактор</a>
+      </nav>
+      <a class="header-cta" href="/create.html">Новый проект</a>
+    </div>
+  </header>
+
+  <main class="page container editor-page">
+    <section class="editor-shell visual-shell">
+      <aside class="slide-nav">
+        <div class="slide-nav-top">
+          <button id="add-slide" type="button" class="btn btn-secondary" style="width:100%">+ Новый слайд</button>
+        </div>
+        <div id="slide-list" class="slide-list"></div>
+      </aside>
+
+      <section class="editor-main">
+        <div class="editor-top">
+          <div>
+            <h2 id="editor-title">Визуальный редактор</h2>
+            <p class="hint" id="editor-sub"></p>
+          </div>
+          <div class="tool-row">
+            <button id="move-up" type="button" class="btn btn-secondary">Слайд вверх</button>
+            <button id="move-down" type="button" class="btn btn-secondary">Слайд вниз</button>
+            <button id="duplicate-slide" type="button" class="btn btn-secondary">Дублировать</button>
+            <button id="delete-slide" type="button" class="btn btn-danger">Удалить</button>
+          </div>
+        </div>
+
+        <div id="editor-empty" class="hint">Нет данных. Сначала сформируйте черновик на странице создания.</div>
+
+        <div id="editor-content" class="hide">
+          <div class="canvas-tools">
+            <label class="field" style="min-width:170px">
+              <span class="lbl">Макет текущего слайда</span>
+              <select id="kind">
+                <option value="title">title</option>
+                <option value="content">content</option>
+                <option value="two_column">two_column</option>
+                <option value="section">section</option>
+                <option value="conclusion">conclusion</option>
+              </select>
+            </label>
+            <div class="active-slide-badge">
+              Активный:
+              <strong id="active-slide-label">1</strong>
+            </div>
+            <button id="add-bullet" type="button" class="btn btn-secondary">+ Пункт</button>
+            <button id="change-image" type="button" class="btn btn-secondary">Заменить фото</button>
+            <button id="clear-image" type="button" class="btn btn-secondary">Очистить фото</button>
+          </div>
+
+          <div class="slide-stage-wrap single-mode">
+            <div id="slide-deck" class="slide-stage-single" aria-label="Активный слайд"></div>
+          </div>
+          <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp" class="hide" />
+
+          <div class="regen-inline">
+            <div class="lbl">Перегенерация текущего слайда по запросу</div>
+            <textarea id="regen-instruction" placeholder="Например: Сделай этот слайд короче и добавь больше акцента на технологии."></textarea>
+            <div class="actions">
+              <button id="regen-slide" type="button" class="btn btn-secondary">Перегенерировать текущий слайд</button>
+              <span id="regen-status" class="hint"></span>
+            </div>
+          </div>
+
+          <div class="footer-bar">
+            <div class="hint">Клик по тексту на слайде включает редактирование прямо в макете.</div>
+            <div class="actions">
+              <a href="/create.html" class="btn btn-secondary">Назад к настройкам</a>
+              <button id="export-btn" type="button" class="btn btn-primary">Скачать презентацию</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/shared.js"></script>
+  <script src="/editor.js"></script>
+</body>
+</html>

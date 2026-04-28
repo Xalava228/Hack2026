@@ -1,0 +1,107 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SlideForge AI - Создание</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-row">
+      <div class="brand"><span class="brand-mark"></span><span>SlideForge Telecom</span></div>
+      <nav class="top-nav">
+        <a href="/">Главная</a>
+        <a href="/create.html">Создание</a>
+        <a href="/editor.html">Редактор</a>
+      </nav>
+      <a class="header-cta" href="/editor.html">К редактору</a>
+    </div>
+  </header>
+
+  <main class="page container">
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Шаг 1: Сформируйте черновик</h2>
+          <p>Выберите параметры генерации и тему. Дальше вы попадете в редактор слайдов.</p>
+        </div>
+      </div>
+
+      <form id="create-form" class="form-grid">
+        <label class="field full">
+          <span class="lbl">Тема / запрос</span>
+          <textarea id="prompt" maxlength="2000" placeholder="Например: Энергетика России: тренды, технологии и прогноз до 2030" required></textarea>
+        </label>
+
+        <label class="field">
+          <span class="lbl">Количество слайдов</span>
+          <input id="n_slides" type="number" min="3" max="20" value="10" />
+        </label>
+
+        <label class="field">
+          <span class="lbl">Плотность текста</span>
+          <div class="seg" data-name="text_density">
+            <button type="button" data-value="minimal">Минимум</button>
+            <button type="button" data-value="balanced" class="active">Краткий</button>
+            <button type="button" data-value="detailed">Подробно</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span class="lbl">Режим изображений</span>
+          <div class="seg" data-name="images_mode">
+            <button type="button" data-value="with-images" class="active">С изображениями</button>
+            <button type="button" data-value="no-images">Без изображений</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span class="lbl">Модель картинок</span>
+          <div class="seg" data-name="image_backend">
+            <button type="button" data-value="yandex-art" class="active">Yandex ART</button>
+            <button type="button" data-value="sd">Stable Diffusion</button>
+          </div>
+        </label>
+
+        <label class="field full">
+          <span class="lbl">Формат экспорта</span>
+          <div class="seg" data-name="output_format">
+            <button type="button" data-value="pptx">PPTX</button>
+            <button type="button" data-value="pdf">PDF</button>
+            <button type="button" data-value="both" class="active">PPTX + PDF</button>
+          </div>
+        </label>
+
+        <div id="sample" class="field full">
+          <span class="lbl">Опционально: взять стиль из образца (PPTX/PDF)</span>
+          <div class="sample-wrap">
+            <input type="file" id="sample-file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+            <div class="sample-actions">
+              <button type="button" class="btn btn-secondary" id="sample-clear">Очистить образец</button>
+            </div>
+            <div id="sample-status" class="sample-status hide"></div>
+          </div>
+        </div>
+
+        <div class="full">
+          <div class="lbl">Быстрые подсказки</div>
+          <div id="suggestion-grid" class="suggestion-grid"></div>
+        </div>
+
+        <div class="actions full">
+          <button class="btn btn-primary" id="build-plan-btn" type="submit">Собрать черновик и перейти в редактор</button>
+          <button class="btn btn-secondary" id="shuffle-btn" type="button">Shuffle</button>
+          <p class="hint" id="form-hint">После генерации откроется отдельная страница редактора.</p>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="/shared.js"></script>
+  <script src="/create.js"></script>
+</body>
+</html>

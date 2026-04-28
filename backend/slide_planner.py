@@ -30,6 +30,7 @@ class SlideSpec:
     bullets: list[str] = field(default_factory=list)
     body: str = ""
     image_prompt: str = ""
+    image_data_url: str = ""
     notes: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,6 +41,7 @@ class SlideSpec:
             "bullets": list(self.bullets),
             "body": self.body,
             "image_prompt": self.image_prompt,
+            "image_data_url": self.image_data_url,
             "notes": self.notes,
         }
 
@@ -60,6 +62,23 @@ class PresentationPlan:
             "palette": self.palette,
             "slides": [s.to_dict() for s in self.slides],
         }
+
+
+def _normalize_kind(raw_kind: str, idx: int, total: int) -> SlideKind:
+    rk = raw_kind.strip().lower()
+    if rk in ("title", "cover"):
+        return "title"
+    if rk in ("conclusion", "outro", "summary", "end"):
+        return "conclusion"
+    if rk in ("section", "divider"):
+        return "section"
+    if rk in ("two_column", "two-column", "twocolumn", "split"):
+        return "two_column"
+    if idx == 0:
+        return "title"
+    if idx == total - 1:
+        return "conclusion"
+    return "content"
 
 
 _DEFAULT_PALETTE = {
@@ -160,23 +179,8 @@ def _extract_json(raw: str) -> dict[str, Any]:
 
 
 def _coerce_slide(d: dict[str, Any], idx: int, total: int) -> SlideSpec:
-    raw_kind = str(d.get("kind") or d.get("type") or "").strip().lower()
-    kind: SlideKind
-    if raw_kind in ("title", "cover"):
-        kind = "title"
-    elif raw_kind in ("conclusion", "outro", "summary", "end"):
-        kind = "conclusion"
-    elif raw_kind in ("section", "divider"):
-        kind = "section"
-    elif raw_kind in ("two_column", "two-column", "twocolumn", "split"):
-        kind = "two_column"
-    else:
-        if idx == 0:
-            kind = "title"
-        elif idx == total - 1:
-            kind = "conclusion"
-        else:
-            kind = "content"
+    raw_kind = str(d.get("kind") or d.get("type") or "")
+    kind = _normalize_kind(raw_kind, idx, total)
 
     bullets_raw = d.get("bullets") or d.get("points") or []
     if isinstance(bullets_raw, str):
@@ -191,6 +195,7 @@ def _coerce_slide(d: dict[str, Any], idx: int, total: int) -> SlideSpec:
         bullets=bullets,
         body=str(d.get("body", "")).strip(),
         image_prompt=str(d.get("image_prompt", "")).strip(),
+        image_data_url=str(d.get("image_data_url", "")).strip(),
         notes=str(d.get("notes", "")).strip(),
     )
 
@@ -205,6 +210,22 @@ def _coerce_palette(p: Any) -> dict[str, str]:
                     value = "#" + value
                 out[str(k)] = value
     return out
+
+
+def plan_from_dict(data: dict[str, Any]) -> PresentationPlan:
+    slides_raw = data.get("slides") or []
+    if not isinstance(slides_raw, list) or not slides_raw:
+        raise ValueError("slides must be a non-empty list")
+    if len(slides_raw) > 25:
+        slides_raw = slides_raw[:25]
+    slides = [_coerce_slide(s if isinstance(s, dict) else {}, i, len(slides_raw)) for i, s in enumerate(slides_raw)]
+    return PresentationPlan(
+        title=str(data.get("title", "")).strip() or "Без названия",
+        subtitle=str(data.get("subtitle", "")).strip(),
+        theme=str(data.get("theme", "")).strip() or "general",
+        palette=_coerce_palette(data.get("palette")),
+        slides=slides,
+    )
 
 
 async def plan_presentation(
@@ -403,3 +424,69 @@ async def plan_presentation_from_sample(
         palette=palette,
         slides=slides,
     )
+
+
+async def regenerate_slide(
+    client: AIClient,
+    *,
+    plan: PresentationPlan,
+    slide_index: int,
+    instruction: str,
+    images_mode: ImagesMode = "with-images",
+) -> SlideSpec:
+    """Regenerate a single slide while keeping consistency with the deck."""
+    if slide_index < 0 or slide_index >= len(plan.slides):
+        raise ValueError("slide_index out of range")
+
+    current = plan.slides[slide_index]
+    outline = [
+        {"n": i + 1, "kind": s.kind, "title": s.title}
+        for i, s in enumerate(plan.slides)
+    ]
+    schema = {
+        "kind": "title|content|two_column|section|conclusion",
+        "title": "string",
+        "subtitle": "string",
+        "bullets": ["string", "..."],
+        "body": "string",
+        "image_prompt": "string",
+        "notes": "string",
+    }
+    prompt = f"""Ты редактор презентаций.
+Презентация:
+- title: {plan.title}
+- subtitle: {plan.subtitle}
+- theme: {plan.theme}
+- outline: {json.dumps(outline, ensure_ascii=False)}
+
+Нужно перегенерировать только слайд №{slide_index + 1}.
+Инструкция пользователя:
+«{instruction}»
+
+Текущий слайд:
+{json.dumps(current.to_dict(), ensure_ascii=False)}
+
+Требования:
+1) Сохрани стиль и логику всей презентации.
+2) Предпочтительно сохрани kind текущего слайда: {current.kind}.
+3) Верни только JSON одного слайда без markdown.
+4) Формат:
+{json.dumps(schema, ensure_ascii=False, indent=2)}
+"""
+    raw = await client.chat(
+        prompt,
+        system_prompt="Возвращай только валидный JSON без пояснений.",
+        max_new_tokens=1800,
+        temperature=0.45,
+    )
+    data = _extract_json(raw)
+    if isinstance(data, dict) and "slide" in data and isinstance(data["slide"], dict):
+        data = data["slide"]
+    slide = _coerce_slide(data if isinstance(data, dict) else {}, slide_index, len(plan.slides))
+    if not slide.title:
+        slide.title = current.title
+    slide.kind = current.kind
+    slide.image_data_url = current.image_data_url
+    if images_mode == "no-images":
+        slide.image_prompt = ""
+    return slide

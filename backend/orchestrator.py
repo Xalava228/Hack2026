@@ -9,7 +9,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -25,6 +27,7 @@ from .slide_planner import (
     ImagesMode,
     PresentationPlan,
     TextDensity,
+    plan_from_dict,
     plan_presentation,
     plan_presentation_from_sample,
 )
@@ -100,6 +103,21 @@ JOBS: dict[str, JobState] = {}
 def _safe_filename(s: str) -> str:
     out = "".join(c if c.isalnum() or c in "-_ " else "_" for c in s).strip()
     return (out or "presentation")[:60]
+
+
+_DATA_URL_RE = re.compile(r"^data:image/[a-zA-Z0-9.+-]+;base64,(.+)$")
+
+
+def _decode_image_data_url(value: str) -> bytes | None:
+    if not value:
+        return None
+    m = _DATA_URL_RE.match(value.strip())
+    if not m:
+        return None
+    try:
+        return base64.b64decode(m.group(1), validate=True)
+    except Exception:
+        return None
 
 
 async def _generate_one_image(
@@ -221,6 +239,78 @@ async def run_pipeline(
     return result
 
 
+async def run_render_pipeline(
+    *,
+    job_id: str,
+    plan_data: dict[str, Any],
+    images_mode: ImagesMode,
+    output_format: OutputFormat,
+    image_backend: ImageBackend = "yandex-art",
+) -> JobResult:
+    """Рендер финальных файлов из уже отредактированного плана."""
+    state = JOBS[job_id]
+    started = time.time()
+    client = AIClient()
+    plan = plan_from_dict(plan_data)
+
+    state.update("planned", 0.25, f"План подтвержден: {len(plan.slides)} слайдов.")
+    images: dict[int, bytes] = {}
+    for i, s in enumerate(plan.slides):
+        custom = _decode_image_data_url(s.image_data_url)
+        if custom:
+            images[i] = custom
+    if images_mode == "with-images":
+        prompt_targets = [
+            (i, s.image_prompt)
+            for i, s in enumerate(plan.slides)
+            if i not in images and s.image_prompt and s.kind not in ("section",)
+        ]
+        if prompt_targets:
+            state.update("images", 0.30, f"Генерируем {len(prompt_targets)} изображений…")
+            sem = asyncio.Semaphore(3)
+
+            async def _bound(i: int, p: str) -> tuple[int, bytes | None]:
+                async with sem:
+                    return await _generate_one_image(client, i, p, image_backend, "16:9")
+
+            tasks = [asyncio.create_task(_bound(i, p)) for i, p in prompt_targets]
+            done = 0
+            for fut in asyncio.as_completed(tasks):
+                i, data = await fut
+                done += 1
+                if data is not None:
+                    images[i] = data
+                state.update("images", 0.30 + 0.5 * (done / max(1, len(tasks))), f"Картинок готово: {done}/{len(tasks)}")
+
+    state.update("rendering", 0.85, "Собираем файлы презентации…")
+    base_name = _safe_filename(plan.title)
+    out_pptx: Path | None = None
+    out_pdf: Path | None = None
+    if output_format in ("pptx", "both"):
+        out_pptx = config.OUTPUT_DIR / f"{job_id}__{base_name}.pptx"
+        build_pptx(plan, images, out_pptx)
+    if output_format in ("pdf", "both"):
+        out_pdf = config.OUTPUT_DIR / f"{job_id}__{base_name}.pdf"
+        build_pdf(plan, images, out_pdf)
+
+    elapsed = time.time() - started
+    result = JobResult(
+        job_id=job_id,
+        plan=plan,
+        pptx_path=out_pptx,
+        pdf_path=out_pdf,
+        images_used=len(images),
+        elapsed=elapsed,
+    )
+    state.status = "done"
+    state.stage = "done"
+    state.progress = 1.0
+    state.message = "Готово!"
+    state.finished_at = time.time()
+    state.result = result
+    return result
+
+
 def create_job() -> str:
     job_id = uuid.uuid4().hex[:12]
     JOBS[job_id] = JobState(job_id=job_id)
@@ -232,6 +322,18 @@ async def run_job_async(job_id: str, **kwargs) -> None:
         await run_pipeline(job_id=job_id, **kwargs)
     except Exception as e:
         logger.exception("Job %s упал", job_id)
+        st = JOBS.get(job_id)
+        if st is not None:
+            st.status = "error"
+            st.error = str(e)
+            st.finished_at = time.time()
+
+
+async def run_render_job_async(job_id: str, **kwargs) -> None:
+    try:
+        await run_render_pipeline(job_id=job_id, **kwargs)
+    except Exception as e:
+        logger.exception("Render job %s упал", job_id)
         st = JOBS.get(job_id)
         if st is not None:
             st.status = "error"

@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SlideForge AI - Экспорт</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-row">
+      <div class="brand"><span class="brand-mark"></span><span>SlideForge Telecom</span></div>
+      <nav class="top-nav">
+        <a href="/">Главная</a>
+        <a href="/create.html">Создание</a>
+        <a href="/editor.html">Редактор</a>
+      </nav>
+      <a class="header-cta" href="/create.html">Новый проект</a>
+    </div>
+  </header>
+
+  <main class="page container">
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Шаг 3: Экспорт и результат</h2>
+          <p id="status-msg">Подготовка...</p>
+        </div>
+      </div>
+
+      <div class="progress"><div id="progress-fill"></div></div>
+      <div class="step-list" id="step-list">
+        <div data-s="planning">План</div>
+        <div data-s="images">Картинки</div>
+        <div data-s="rendering">Сборка</div>
+        <div data-s="done">Готово</div>
+      </div>
+
+      <div id="result-wrap" class="hide">
+        <h3 id="result-title"></h3>
+        <p class="hint" id="result-sub"></p>
+        <div id="result-links" class="result-links"></div>
+        <div id="outline" class="outline"></div>
+      </div>
+
+      <div id="error-wrap" class="hide" style="margin-top:12px;color:#8f2a2a"></div>
+
+      <div class="footer-bar">
+        <a href="/editor.html" class="btn btn-secondary">Вернуться в редактор</a>
+        <a href="/create.html" class="btn btn-primary">Создать новую презентацию</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="/shared.js"></script>
+  <script src="/export.js"></script>
+</body>
+</html>

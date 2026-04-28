@@ -1,225 +1,92 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SlideForge AI — генератор презентаций</title>
+  <title>SlideForge AI - Главная</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div class="bg-blob blob-1"></div>
-  <div class="bg-blob blob-2"></div>
-  <div class="bg-blob blob-3"></div>
-
-  <header class="top">
-    <div class="brand">
-      <div class="logo">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <rect x="2" y="4" width="24" height="16" rx="3" stroke="currentColor" stroke-width="2"/>
-          <path d="M8 24h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M14 20v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M7 10l3 3 4-5 4 4 3-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span>SlideForge<span class="dot">.</span>AI</span>
-      </div>
+  <header class="site-header">
+    <div class="container header-row">
+      <div class="brand"><span class="brand-mark"></span><span>SlideForge Telecom</span></div>
+      <nav class="top-nav">
+        <a href="/">Главная</a>
+        <a href="/create.html">Создание</a>
+        <a href="/editor.html">Редактор</a>
+      </nav>
+      <a class="header-cta" href="/create.html">Создать</a>
     </div>
-    <nav class="nav">
-      <a href="#features">Возможности</a>
-      <a href="#how">Как работает</a>
-      <a href="#generator" class="cta-link">Создать →</a>
-    </nav>
   </header>
 
-  <main>
+  <main class="page container">
     <section class="hero">
-      <div class="hero-badge">⚡ AI-презентации за 60 секунд</div>
-      <h1 class="hero-title">
-        Превращайте идеи<br/>
-        в <span class="grad">готовые презентации</span>
-      </h1>
-      <p class="hero-sub">
-        Опишите тему — нейросеть сама придумает структуру, напишет тексты,
-        нарисует иллюстрации и соберёт PPTX и PDF. Без шаблонов и копипаста.
-      </p>
-      <div class="hero-cta">
-        <a href="#generator" class="btn btn-primary">Создать презентацию</a>
-        <a href="#how" class="btn btn-ghost">Как это работает</a>
+      <h1>Создавайте презентации с ИИ в несколько шагов</h1>
+      <p>Полный цикл: генерация структуры, визуальный редактор, правка текста и фото, перегенерация отдельных слайдов, экспорт в PPTX/PDF.</p>
+      <div class="actions" style="margin-top:18px">
+        <a class="btn btn-primary" href="/create.html">Начать проект</a>
+        <a class="btn btn-secondary" href="/editor.html">Открыть редактор</a>
       </div>
     </section>
 
-    <section id="features" class="features">
-      <div class="feat">
-        <div class="feat-ic">🧠</div>
-        <h3>Умная структура</h3>
-        <p>Qwen 2.5 (72B) сам разбивает тему на логичные слайды: вступление, разделы, выводы.</p>
-      </div>
-      <div class="feat">
-        <div class="feat-ic">🎨</div>
-        <h3>AI-иллюстрации</h3>
-        <p>Каждой странице — своя картинка от Yandex ART или Stable Diffusion.</p>
-      </div>
-      <div class="feat">
-        <div class="feat-ic">📦</div>
-        <h3>PPTX и PDF</h3>
-        <p>Готовый файл, который можно открыть в PowerPoint, Keynote или Google Slides.</p>
-      </div>
-      <div class="feat">
-        <div class="feat-ic">🎛️</div>
-        <h3>Полный контроль</h3>
-        <p>Кол-во слайдов, плотность текста, наличие картинок, формат — всё в одном окне.</p>
-      </div>
+    <section class="action-grid">
+      <a class="action-card" href="/create.html">
+        <div class="action-badge">⚡</div>
+        <h3>Сгенерировать</h3>
+        <p>Создайте черновой план презентации по запросу и настройкам.</p>
+      </a>
+      <a class="action-card" href="/create.html#sample">
+        <div class="action-badge">📎</div>
+        <h3>Из образца</h3>
+        <p>Загрузите PPTX/PDF, чтобы перенять стиль и структуру.</p>
+      </a>
+      <a class="action-card" href="/editor.html">
+        <div class="action-badge">🛠</div>
+        <h3>Редактор</h3>
+        <p>Изменяйте порядок слайдов, макеты, текст, фото и буллеты.</p>
+      </a>
+      <a class="action-card" href="/create.html">
+        <div class="action-badge">📤</div>
+        <h3>Экспорт</h3>
+        <p>После правок выгрузите презентацию в PPTX и PDF.</p>
+      </a>
     </section>
 
-    <section id="generator" class="generator">
-      <div class="card sample-card" id="sample-card">
-        <div class="card-head">
-          <h2>📎 По образцу <span class="badge-soft">опционально</span></h2>
-          <p>Загрузите готовую презентацию (PPTX или PDF) — ИИ проанализирует её структуру и палитру и создаст новую с похожим стилем.</p>
-        </div>
-
-        <div id="dropzone" class="dropzone">
-          <input type="file" id="sample-file" accept=".pptx,.pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf" hidden />
-          <div class="dz-inner">
-            <div class="dz-icon">⬆️</div>
-            <div class="dz-title">Перетащите PPTX или PDF сюда</div>
-            <div class="dz-sub">или <span class="dz-pick">выберите файл</span> · до 30 МБ</div>
-          </div>
-        </div>
-
-        <div id="sample-status" class="sample-status hidden"></div>
-
-        <div id="sample-preview" class="sample-preview hidden">
-          <div class="sp-row">
-            <div class="sp-name" id="sp-name">—</div>
-            <button type="button" class="sp-remove" id="sample-remove">Удалить образец ✕</button>
-          </div>
-          <div class="sp-stats" id="sp-stats"></div>
-          <div class="sp-palette" id="sp-palette"></div>
-          <details class="sp-outline">
-            <summary>Структура образца</summary>
-            <div id="sp-outline-body"></div>
-          </details>
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Недавние запросы</h2>
+          <p>Можно быстро продолжить работу с последней идеи.</p>
         </div>
       </div>
-
-      <div class="card">
-        <div class="card-head">
-          <h2>Создать презентацию</h2>
-          <p id="gen-card-sub">Опишите тему — остальное сделает ИИ.</p>
-        </div>
-
-        <form id="gen-form" class="form">
-          <label class="field full">
-            <span class="lbl">Тема презентации</span>
-            <textarea
-              id="prompt"
-              name="prompt"
-              rows="3"
-              maxlength="2000"
-              placeholder="Например: «История развития искусственного интеллекта от Тьюринга до GPT-5»"
-              required></textarea>
-          </label>
-
-          <label class="field">
-            <span class="lbl">Количество слайдов</span>
-            <div class="slider-row">
-              <input id="n_slides" name="n_slides" type="range" min="3" max="20" step="1" value="8" />
-              <span id="n_slides_val" class="slider-val">8</span>
-            </div>
-          </label>
-
-          <label class="field">
-            <span class="lbl">Плотность текста</span>
-            <div class="seg" data-name="text_density">
-              <button type="button" data-value="minimal">Минимум</button>
-              <button type="button" data-value="balanced" class="active">Баланс</button>
-              <button type="button" data-value="detailed">Подробно</button>
-            </div>
-          </label>
-
-          <label class="field">
-            <span class="lbl">Картинки</span>
-            <div class="seg" data-name="images_mode">
-              <button type="button" data-value="with-images" class="active">С AI-картинками</button>
-              <button type="button" data-value="no-images">Без картинок</button>
-            </div>
-          </label>
-
-          <label class="field">
-            <span class="lbl">Генератор картинок</span>
-            <div class="seg" data-name="image_backend">
-              <button type="button" data-value="yandex-art" class="active">Yandex ART</button>
-              <button type="button" data-value="sd">Stable Diffusion</button>
-            </div>
-          </label>
-
-          <label class="field">
-            <span class="lbl">Формат файла</span>
-            <div class="seg" data-name="output_format">
-              <button type="button" data-value="pptx">PPTX</button>
-              <button type="button" data-value="pdf">PDF</button>
-              <button type="button" data-value="both" class="active">PPTX + PDF</button>
-            </div>
-          </label>
-
-          <div class="actions full">
-            <button type="submit" class="btn btn-primary big" id="submit-btn">
-              <span class="btn-text">Сгенерировать ✨</span>
-            </button>
-            <p class="hint">Обычно занимает 30–90 секунд в зависимости от количества картинок.</p>
-          </div>
-        </form>
-      </div>
-
-      <div id="progress-card" class="card progress-card hidden">
-        <div class="card-head">
-          <h2 id="progress-title">Готовим вашу презентацию…</h2>
-          <p id="progress-msg">Запрашиваем у LLM структуру…</p>
-        </div>
-        <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
-        <ol class="steps" id="steps">
-          <li data-stage="planning">📋 Планируем структуру</li>
-          <li data-stage="images">🎨 Рисуем картинки</li>
-          <li data-stage="rendering">📦 Собираем файлы</li>
-          <li data-stage="done">✅ Готово</li>
-        </ol>
-      </div>
-
-      <div id="result-card" class="card result-card hidden">
-        <div class="card-head">
-          <h2 id="result-title">Готово!</h2>
-          <p id="result-sub">Скачайте презентацию или посмотрите план слайдов.</p>
-        </div>
-        <div class="downloads" id="downloads"></div>
-        <div class="outline" id="outline"></div>
-        <button class="btn btn-ghost" id="restart-btn">Создать ещё одну</button>
-      </div>
-
-      <div id="error-card" class="card error-card hidden">
-        <h2>Что-то пошло не так</h2>
-        <p id="error-msg"></p>
-        <button class="btn btn-ghost" id="retry-btn">Попробовать снова</button>
-      </div>
-    </section>
-
-    <section id="how" class="how">
-      <h2>Как это работает</h2>
-      <div class="how-grid">
-        <div class="step"><b>1.</b> Описываете тему и параметры</div>
-        <div class="step"><b>2.</b> LLM строит структуру слайдов в JSON</div>
-        <div class="step"><b>3.</b> Параллельно генерируем иллюстрации</div>
-        <div class="step"><b>4.</b> Собираем PPTX и PDF и отдаём вам</div>
-      </div>
+      <div id="recent-list" class="recent-list"></div>
     </section>
   </main>
 
-  <footer>
-    <span>SlideForge.AI · сделано на FastAPI + Qwen + Yandex ART · 2026</span>
-  </footer>
-
-  <script src="/app.js"></script>
+  <script src="/shared.js"></script>
+  <script>
+    (function () {
+      const listEl = document.getElementById('recent-list');
+      const items = window.SF.loadRecentPrompts();
+      if (!items.length) {
+        listEl.innerHTML = '<div class="recent-item"><small>Пока нет сохраненных запросов</small></div>';
+        return;
+      }
+      listEl.innerHTML = '';
+      items.forEach((q) => {
+        const div = document.createElement('div');
+        div.className = 'recent-item';
+        div.innerHTML = `<div>${window.SF.escapeHtml(q)}</div><small>Нажмите, чтобы продолжить</small>`;
+        div.addEventListener('click', () => {
+          sessionStorage.setItem('sf.prefill.prompt', q);
+          location.href = '/create.html';
+        });
+        listEl.appendChild(div);
+      });
+    })();
+  </script>
 </body>
 </html>
