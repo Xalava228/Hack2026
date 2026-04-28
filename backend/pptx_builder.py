@@ -177,29 +177,41 @@ def _add_bullets(
 
 def _add_image(slide, image_bytes: bytes, left, top, width, height) -> None:
     try:
-        with PILImage.open(io.BytesIO(image_bytes)) as im:
+        with PILImage.open(io.BytesIO(image_bytes)) as src:
+            im = src.convert("RGB")
             iw, ih = im.size
     except Exception:
         return
 
-    box_w = int(width)
-    box_h = int(height)
-    if iw <= 0 or ih <= 0 or box_w <= 0 or box_h <= 0:
+    box_w_emu = int(width)
+    box_h_emu = int(height)
+    if iw <= 0 or ih <= 0 or box_w_emu <= 0 or box_h_emu <= 0:
         return
 
-    ratio = min(box_w / iw, box_h / ih)
-    draw_w = int(iw * ratio)
-    draw_h = int(ih * ratio)
-    draw_left = int(left) + (box_w - draw_w) // 2
-    draw_top = int(top) + (box_h - draw_h) // 2
+    # PowerPoint передаёт размеры в EMU, а Pillow ждёт пиксели.
+    # 1 px ~= 9525 EMU (при 96 DPI). Без перевода получаются гигантские resize и MemoryError.
+    box_w_px = max(64, min(4096, box_w_emu // 9525))
+    box_h_px = max(64, min(4096, box_h_emu // 9525))
 
-    bio = io.BytesIO(image_bytes)
+    # Fill strategy: center-crop image to occupy the whole right pane.
+    ratio = max(box_w_px / iw, box_h_px / ih)
+    scaled_w = max(1, int(iw * ratio))
+    scaled_h = max(1, int(ih * ratio))
+    resample = getattr(getattr(PILImage, "Resampling", PILImage), "LANCZOS", PILImage.BICUBIC)
+    resized = im.resize((scaled_w, scaled_h), resample)
+    crop_left = max(0, (scaled_w - box_w_px) // 2)
+    crop_top = max(0, (scaled_h - box_h_px) // 2)
+    cropped = resized.crop((crop_left, crop_top, crop_left + box_w_px, crop_top + box_h_px))
+    bio = io.BytesIO()
+    cropped.save(bio, format="PNG")
+    bio.seek(0)
+
     pic = slide.shapes.add_picture(
         bio,
-        Emu(draw_left),
-        Emu(draw_top),
-        width=Emu(draw_w),
-        height=Emu(draw_h),
+        Emu(int(left)),
+        Emu(int(top)),
+        width=Emu(box_w_emu),
+        height=Emu(box_h_emu),
     )
     pic.shadow.inherit = False
 
@@ -445,7 +457,38 @@ def _render_content(
             )
 
     text_color = pal["text"] if layout != "bold" else pal["background"]
-    if spec.bullets:
+    has_bullets = bool(spec.bullets)
+    has_body = bool(str(spec.body or "").strip())
+    if has_bullets and has_body:
+        # Согласуем с editor: когда есть и bullets, и body, показываем оба блока.
+        bullets_h = Emu(int(int(text_height) * 0.62))
+        gap = Inches(0.12)
+        body_top = Emu(int(text_top) + int(bullets_h) + int(gap))
+        body_h = Emu(max(int(Inches(0.55)), int(text_height) - int(bullets_h) - int(gap)))
+        _add_bullets(
+            slide,
+            text_left,
+            text_top,
+            text_width,
+            bullets_h,
+            spec.bullets,
+            color=text_color,
+            accent=pal["accent"],
+            size=max(14, int(20 * body_scale)),
+            font_name=body_font,
+        )
+        _add_textbox(
+            slide,
+            text_left,
+            body_top,
+            text_width,
+            body_h,
+            spec.body,
+            color=text_color,
+            size=max(12, int(15 * body_scale)),
+            font_name=body_font,
+        )
+    elif has_bullets:
         _add_bullets(
             slide,
             text_left,
@@ -458,7 +501,7 @@ def _render_content(
             size=max(14, int(20 * body_scale)),
             font_name=body_font,
         )
-    elif spec.body:
+    elif has_body:
         _add_textbox(
             slide,
             text_left,

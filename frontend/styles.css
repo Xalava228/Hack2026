@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg: #f4f5f7;
   --surface: #ffffff;
   --surface-soft: #f2f3f7;
@@ -885,6 +885,7 @@ textarea:focus {
 
 .content-body-row.with-image {
   grid-template-columns: minmax(0, 1fr) 40.6%;
+  align-items: stretch;
 }
 
 .content-body-row.with-image .content-text {
@@ -897,6 +898,7 @@ textarea:focus {
 
 .content-body-row.with-image.image-left {
   grid-template-columns: 40.6% minmax(0, 1fr);
+  align-items: stretch;
 }
 
 .content-body-row.with-image.image-left .content-text {
@@ -1223,8 +1225,8 @@ textarea:focus {
 .slide-image-pane img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  background: rgba(255, 255, 255, 0.4);
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.18);
   display: block;
 }
 
