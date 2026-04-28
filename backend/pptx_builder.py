@@ -15,7 +15,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
-from .design_presets import merge_slide_palette
+from .design_presets import merge_slide_palette, style_for_preset
 from .slide_planner import PresentationPlan, SlideSpec
 
 SLIDE_W = Inches(13.333)
@@ -28,6 +28,10 @@ def _slide_palette(plan: PresentationPlan, spec: SlideSpec) -> dict[str, str]:
 
 def _preset_pid(plan: PresentationPlan) -> str:
     return getattr(plan, "design_preset", None) or "fresh"
+
+
+def _preset_style(plan: PresentationPlan) -> dict[str, str | float]:
+    return style_for_preset(_preset_pid(plan))
 
 
 def _decorate_modern_title(slide, pal: dict[str, str], pid: str) -> None:
@@ -97,6 +101,7 @@ def _add_textbox(
     size: int,
     bold: bool = False,
     align: str = "left",
+    font_name: str = "Calibri",
 ) -> None:
     tb = slide.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame
@@ -113,7 +118,7 @@ def _add_textbox(
     }.get(align, PP_ALIGN.LEFT)
     run = p.add_run()
     run.text = text
-    run.font.name = "Calibri"
+    run.font.name = font_name or "Calibri"
     run.font.size = Pt(size)
     run.font.bold = bold
     run.font.color.rgb = _hex(color)
@@ -130,6 +135,7 @@ def _add_bullets(
     color: str,
     accent: str,
     size: int = 20,
+    font_name: str = "Calibri",
 ) -> None:
     tb = slide.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame
@@ -145,14 +151,14 @@ def _add_bullets(
 
         marker = p.add_run()
         marker.text = "●  "
-        marker.font.name = "Calibri"
+        marker.font.name = font_name or "Calibri"
         marker.font.size = Pt(size)
         marker.font.bold = True
         marker.font.color.rgb = _hex(accent)
 
         run = p.add_run()
         run.text = item
-        run.font.name = "Calibri"
+        run.font.name = font_name or "Calibri"
         run.font.size = Pt(size)
         run.font.color.rgb = _hex(color)
 
@@ -196,6 +202,7 @@ def _add_table(
     rows: list[list[str]],
     *,
     palette: dict[str, str],
+    font_name: str = "Calibri",
 ) -> None:
     if not headers:
         return
@@ -220,7 +227,7 @@ def _add_table(
         p.alignment = PP_ALIGN.LEFT
         run = p.add_run()
         run.text = str(header)
-        run.font.name = "Calibri"
+        run.font.name = font_name or "Calibri"
         run.font.size = Pt(15)
         run.font.bold = True
         run.font.color.rgb = _hex(palette["background"])
@@ -244,13 +251,18 @@ def _add_table(
             p.alignment = PP_ALIGN.LEFT
             run = p.add_run()
             run.text = str(row[c]) if c < len(row) else ""
-            run.font.name = "Calibri"
+            run.font.name = font_name or "Calibri"
             run.font.size = Pt(13)
             run.font.color.rgb = body_text
 
 
 def _render_title(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) -> None:
     pid = _preset_pid(plan)
+    style = _preset_style(plan)
+    title_font = str(style.get("title_font", "Calibri"))
+    body_font = str(style.get("body_font", "Calibri"))
+    title_scale = float(style.get("title_scale", 1.0))
+    body_scale = float(style.get("body_scale", 1.0))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -269,9 +281,10 @@ def _render_title(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) ->
         Inches(2.0),
         spec.title or plan.title,
         color=pal["primary"],
-        size=54,
+        size=max(34, int(54 * title_scale)),
         bold=True,
         align="center",
+        font_name=title_font,
     )
     if spec.subtitle or plan.subtitle:
         _add_textbox(
@@ -282,12 +295,18 @@ def _render_title(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) ->
             Inches(1.2),
             spec.subtitle or plan.subtitle,
             color=pal["muted"],
-            size=24,
+            size=max(16, int(24 * body_scale)),
             align="center",
+            font_name=body_font,
         )
 
 
 def _render_section(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) -> None:
+    style = _preset_style(plan)
+    title_font = str(style.get("title_font", "Calibri"))
+    body_font = str(style.get("body_font", "Calibri"))
+    title_scale = float(style.get("title_scale", 1.0))
+    body_scale = float(style.get("body_scale", 1.0))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -300,9 +319,10 @@ def _render_section(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) 
         Inches(1.6),
         spec.title,
         color=pal["background"],
-        size=48,
+        size=max(30, int(48 * title_scale)),
         bold=True,
         align="center",
+        font_name=title_font,
     )
     if spec.subtitle:
         _add_textbox(
@@ -313,8 +333,9 @@ def _render_section(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) 
             Inches(1.0),
             spec.subtitle,
             color=pal["accent"],
-            size=24,
+            size=max(16, int(24 * body_scale)),
             align="center",
+            font_name=body_font,
         )
 
 
@@ -325,6 +346,12 @@ def _render_content(
     image: bytes | None,
 ) -> None:
     pid = _preset_pid(plan)
+    style = _preset_style(plan)
+    title_font = str(style.get("title_font", "Calibri"))
+    body_font = str(style.get("body_font", "Calibri"))
+    title_scale = float(style.get("title_scale", 1.0))
+    body_scale = float(style.get("body_scale", 1.0))
+    underline_ratio = float(style.get("underline_ratio", 0.09))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -343,14 +370,15 @@ def _render_content(
         Inches(0.9),
         spec.title,
         color=pal["primary"],
-        size=32,
+        size=max(24, int(32 * title_scale)),
         bold=True,
+        font_name=title_font,
     )
     underline = slide.shapes.add_shape(
         MSO_SHAPE.RECTANGLE,
         title_left,
         Inches(1.45),
-        Inches(1.35),
+        Inches(max(0.9, min(2.1, 15 * underline_ratio))),
         Emu(38100),
     )
     _set_solid_fill(underline, pal["accent"])
@@ -390,7 +418,8 @@ def _render_content(
             spec.bullets,
             color=pal["text"],
             accent=pal["accent"],
-            size=20,
+            size=max(14, int(20 * body_scale)),
+            font_name=body_font,
         )
     elif spec.body:
         _add_textbox(
@@ -401,7 +430,8 @@ def _render_content(
             text_height,
             spec.body,
             color=pal["text"],
-            size=18,
+            size=max(13, int(18 * body_scale)),
+            font_name=body_font,
         )
 
     if has_image:
@@ -415,6 +445,11 @@ def _render_two_column(
     image: bytes | None,
 ) -> None:
     pid = _preset_pid(plan)
+    style = _preset_style(plan)
+    title_font = str(style.get("title_font", "Calibri"))
+    body_font = str(style.get("body_font", "Calibri"))
+    title_scale = float(style.get("title_scale", 1.0))
+    body_scale = float(style.get("body_scale", 1.0))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -431,8 +466,9 @@ def _render_two_column(
         Inches(0.9),
         spec.title,
         color=pal["primary"],
-        size=32,
+        size=max(24, int(32 * title_scale)),
         bold=True,
+        font_name=title_font,
     )
 
     half = (SLIDE_W - Inches(2.1)) / 2
@@ -449,7 +485,8 @@ def _render_two_column(
         left_b,
         color=pal["text"],
         accent=pal["accent"],
-        size=20,
+        size=max(14, int(20 * body_scale)),
+        font_name=body_font,
     )
     if right_b:
         _add_bullets(
@@ -461,7 +498,8 @@ def _render_two_column(
             right_b,
             color=pal["text"],
             accent=pal["accent"],
-            size=20,
+            size=max(14, int(20 * body_scale)),
+            font_name=body_font,
         )
     elif image is not None:
         _add_image(
@@ -476,6 +514,12 @@ def _render_two_column(
 
 def _render_table_slide(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) -> None:
     pid = _preset_pid(plan)
+    style = _preset_style(plan)
+    title_font = str(style.get("title_font", "Calibri"))
+    body_font = str(style.get("body_font", "Calibri"))
+    title_scale = float(style.get("title_scale", 1.0))
+    body_scale = float(style.get("body_scale", 1.0))
+    underline_ratio = float(style.get("underline_ratio", 0.09))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -493,14 +537,15 @@ def _render_table_slide(prs: Presentation, plan: PresentationPlan, spec: SlideSp
         Inches(0.9),
         spec.title,
         color=pal["primary"],
-        size=32,
+        size=max(24, int(32 * title_scale)),
         bold=True,
+        font_name=title_font,
     )
     underline = slide.shapes.add_shape(
         MSO_SHAPE.RECTANGLE,
         title_left,
         Inches(1.45),
-        Inches(1.35),
+        Inches(max(0.9, min(2.1, 15 * underline_ratio))),
         Emu(38100),
     )
     _set_solid_fill(underline, pal["accent"])
@@ -514,7 +559,8 @@ def _render_table_slide(prs: Presentation, plan: PresentationPlan, spec: SlideSp
             Inches(0.5),
             spec.subtitle,
             color=pal["muted"],
-            size=15,
+            size=max(12, int(15 * body_scale)),
+            font_name=body_font,
         )
 
     table_top = Inches(2.2) if spec.subtitle else Inches(1.85)
@@ -531,12 +577,18 @@ def _render_table_slide(prs: Presentation, plan: PresentationPlan, spec: SlideSp
             spec.headers,
             spec.rows,
             palette=pal,
+            font_name=body_font,
         )
 
 
 def _render_conclusion(
     prs: Presentation, plan: PresentationPlan, spec: SlideSpec
 ) -> None:
+    style = _preset_style(plan)
+    title_font = str(style.get("title_font", "Calibri"))
+    body_font = str(style.get("body_font", "Calibri"))
+    title_scale = float(style.get("title_scale", 1.0))
+    body_scale = float(style.get("body_scale", 1.0))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -556,9 +608,10 @@ def _render_conclusion(
         Inches(1.2),
         spec.title or "Выводы",
         color=pal["primary"],
-        size=40,
+        size=max(28, int(40 * title_scale)),
         bold=True,
         align="center",
+        font_name=title_font,
     )
 
     if spec.bullets:
@@ -571,7 +624,8 @@ def _render_conclusion(
             spec.bullets,
             color=pal["text"],
             accent=pal["accent"],
-            size=22,
+            size=max(16, int(22 * body_scale)),
+            font_name=body_font,
         )
     elif spec.body:
         _add_textbox(
@@ -582,8 +636,9 @@ def _render_conclusion(
             Inches(4.0),
             spec.body,
             color=pal["text"],
-            size=22,
+            size=max(16, int(22 * body_scale)),
             align="center",
+            font_name=body_font,
         )
 
     if spec.subtitle:
@@ -595,8 +650,9 @@ def _render_conclusion(
             Inches(0.6),
             spec.subtitle,
             color=pal["muted"],
-            size=18,
+            size=max(13, int(18 * body_scale)),
             align="center",
+            font_name=body_font,
         )
 
 

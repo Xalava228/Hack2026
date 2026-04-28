@@ -145,6 +145,20 @@
     forest: 'Лес (зелёный)',
   };
 
+  const PRESET_STYLE_TOKENS = {
+    fresh: { titleFont: '"Calibri", "Segoe UI", sans-serif', bodyFont: '"Calibri", "Segoe UI", sans-serif', underlineRatio: 0.09 },
+    ocean: { titleFont: '"Segoe UI", "Trebuchet MS", sans-serif', bodyFont: '"Segoe UI", "Arial", sans-serif', underlineRatio: 0.12 },
+    sunrise: { titleFont: '"Trebuchet MS", "Verdana", sans-serif', bodyFont: '"Verdana", "Arial", sans-serif', underlineRatio: 0.1 },
+    midnight: { titleFont: '"Bahnschrift", "Segoe UI", sans-serif', bodyFont: '"Bahnschrift", "Segoe UI", sans-serif', underlineRatio: 0.14 },
+    pastel: { titleFont: '"Candara", "Segoe UI", sans-serif', bodyFont: '"Candara", "Segoe UI", sans-serif', underlineRatio: 0.11 },
+    forest: { titleFont: '"Cambria", "Times New Roman", serif', bodyFont: '"Cambria", "Georgia", serif', underlineRatio: 0.08 },
+  };
+
+  function styleForPreset(presetId) {
+    const pid = Object.prototype.hasOwnProperty.call(PRESET_STYLE_TOKENS, presetId) ? presetId : 'fresh';
+    return { ...PRESET_STYLE_TOKENS.fresh, ...(PRESET_STYLE_TOKENS[pid] || {}) };
+  }
+
   window.SF = {
     saveState,
     loadState,
@@ -160,5 +174,6 @@
     normalizeHex,
     mergeSlidePalette,
     DESIGN_PRESET_LABELS,
+    styleForPreset,
   };
 })();

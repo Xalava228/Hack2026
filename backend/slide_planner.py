@@ -22,6 +22,15 @@ from .sample_analyzer import SampleAnalysis, sample_outline_for_llm
 
 logger = logging.getLogger(__name__)
 
+PRESET_DIRECTION_HINTS: dict[str, str] = {
+    "fresh": "чистый современный стиль: лаконичные заголовки и прозрачная структура.",
+    "ocean": "корпоративно-спокойный стиль: аккуратный тон и четкое деление на смысловые блоки.",
+    "sunrise": "динамичный стиль: энергичные заголовки, контрастные тезисы и action-ориентированные блоки.",
+    "midnight": "премиальный стиль: сильные формулировки, меньше воды, больше конкретных выводов.",
+    "pastel": "storytelling-стиль: мягкие переходы между блоками и дружелюбные формулировки.",
+    "forest": "аналитичный стиль: причинно-следственные связи, прагматичная подача, практические рекомендации.",
+}
+
 
 TextDensity = Literal["minimal", "balanced", "detailed"]
 ImagesMode = Literal["with-images", "no-images", "internet-images"]
@@ -197,6 +206,7 @@ def _build_prompt(
     language: str,
     *,
     preset_label: str = "",
+    preset_hint: str = "",
     web_context: str = "",
 ) -> str:
     density_block = _density_block(text_density)
@@ -249,6 +259,7 @@ def _build_prompt(
 - Изображения: {images_hint}
 - Язык контента: {language}
 - Визуальный пресет дизайна (выбран пользователем, цвета в экспорте применятся к пресету): {preset_label or "по умолчанию"}
+- Направление пресета (типографика, композиция, ритм блоков): {preset_hint or "универсальный деловой стиль"}
 {web_context if web_context else ""}
 
 Требования:
@@ -479,8 +490,16 @@ async def plan_presentation(
     language = _detect_language(user_prompt)
     dp = canonical_preset_id(design_preset)
     preset_label = PRESET_LABELS_RU.get(dp, dp)
+    preset_hint = PRESET_DIRECTION_HINTS.get(dp, PRESET_DIRECTION_HINTS["fresh"])
     prompt = _build_prompt(
-        user_prompt, n_slides, text_density, images_mode, language, preset_label=preset_label, web_context=web_context
+        user_prompt,
+        n_slides,
+        text_density,
+        images_mode,
+        language,
+        preset_label=preset_label,
+        preset_hint=preset_hint,
+        web_context=web_context,
     )
 
     raw = await client.chat(

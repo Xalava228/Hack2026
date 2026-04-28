@@ -80,6 +80,51 @@ PRESET_LABELS_RU: dict[str, str] = {
     "forest": "Лес (зелёный)",
 }
 
+PRESET_STYLE_TOKENS: dict[str, dict[str, str | float]] = {
+    "fresh": {
+        "title_font": "Calibri",
+        "body_font": "Calibri",
+        "title_scale": 1.0,
+        "body_scale": 1.0,
+        "underline_ratio": 0.09,
+    },
+    "ocean": {
+        "title_font": "Segoe UI Semibold",
+        "body_font": "Segoe UI",
+        "title_scale": 1.02,
+        "body_scale": 1.0,
+        "underline_ratio": 0.12,
+    },
+    "sunrise": {
+        "title_font": "Trebuchet MS",
+        "body_font": "Verdana",
+        "title_scale": 1.04,
+        "body_scale": 0.98,
+        "underline_ratio": 0.1,
+    },
+    "midnight": {
+        "title_font": "Bahnschrift SemiBold",
+        "body_font": "Bahnschrift",
+        "title_scale": 1.03,
+        "body_scale": 1.02,
+        "underline_ratio": 0.14,
+    },
+    "pastel": {
+        "title_font": "Candara Bold",
+        "body_font": "Candara",
+        "title_scale": 1.02,
+        "body_scale": 1.0,
+        "underline_ratio": 0.11,
+    },
+    "forest": {
+        "title_font": "Cambria Bold",
+        "body_font": "Cambria",
+        "title_scale": 1.0,
+        "body_scale": 1.0,
+        "underline_ratio": 0.08,
+    },
+}
+
 VALID_PRESETS: frozenset[str] = frozenset(PRESET_PALETTES.keys())
 
 DEFAULT_PRESET: DesignPresetId = "fresh"
@@ -168,3 +213,10 @@ def coerce_hex(value: Any, fallback: str) -> str:
     if len(fb) != 7:
         fb = "#FFFFFF"
     return _normalize_hex(value, fb)
+
+
+def style_for_preset(preset_id: str) -> dict[str, str | float]:
+    pid = canonical_preset_id(preset_id)
+    base = PRESET_STYLE_TOKENS.get(DEFAULT_PRESET, {})
+    cur = PRESET_STYLE_TOKENS.get(pid, {})
+    return {**base, **cur}

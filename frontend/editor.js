@@ -383,6 +383,7 @@
 
   function applyPalette(canvas, slide) {
     const merged = window.SF.mergeSlidePalette(state.plan.palette, slide.style);
+    const presetStyle = window.SF.styleForPreset(state.plan.design_preset || 'fresh');
     const map = {
       '--p-bg': merged.background,
       '--p-primary': merged.primary,
@@ -391,6 +392,9 @@
       '--p-surface': merged.surface,
       '--p-text': merged.text,
       '--p-muted': merged.muted,
+      '--p-font-title': presetStyle.titleFont,
+      '--p-font-body': presetStyle.bodyFont,
+      '--p-underline-ratio': String(presetStyle.underlineRatio || 0.09),
     };
     Object.entries(map).forEach(([k, v]) => canvas.style.setProperty(k, v));
   }
