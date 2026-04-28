@@ -76,13 +76,15 @@ class AIClient:
             },
         }
         url = f"{self.base_url}/llama/chat"
-        async with httpx.AsyncClient(timeout=self.timeout) as cli:
-            r = await cli.post(url, headers=self._headers, json=payload)
-            if r.status_code >= 400:
-                raise AIClientError(
-                    f"LLM HTTP {r.status_code}: {r.text[:1000]}"
-                )
-            data = r.json()
+        try:
+            r = await self._post_with_retries(url, payload, retries=3, backoff=1.2)
+        except Exception as e:
+            raise AIClientError(f"Не удалось подключиться к LLM: {e}") from e
+        if r.status_code >= 400:
+            raise AIClientError(
+                f"LLM HTTP {r.status_code}: {r.text[:1000]}"
+            )
+        data = r.json()
         return _extract_message_content(data)
 
     async def _post_with_retries(

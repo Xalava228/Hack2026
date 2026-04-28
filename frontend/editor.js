@@ -1,6 +1,21 @@
 ﻿(function () {
   const state = window.SF.loadState();
 
+  const PLAN_COLOR_FIELDS = [
+    { k: 'background', label: 'Фон' },
+    { k: 'primary', label: 'Заголовки' },
+    { k: 'accent', label: 'Акцент' },
+    { k: 'text', label: 'Текст' },
+    { k: 'muted', label: 'Второстеп.' },
+  ];
+
+  const SLIDE_OVERRIDE_FIELDS = [
+    { k: 'background', label: 'Фон слайда' },
+    { k: 'primary', label: 'Заголовки' },
+    { k: 'text', label: 'Текст' },
+    { k: 'accent', label: 'Акцент' },
+  ];
+
   const listEl = document.getElementById('slide-list');
   const editorEmptyEl = document.getElementById('editor-empty');
   const editorContentEl = document.getElementById('editor-content');
@@ -19,6 +34,15 @@
   const changeImageBtn = document.getElementById('change-image');
   const clearImageBtn = document.getElementById('clear-image');
   const imageFileEl = document.getElementById('image-file');
+  const tableToolsEl = document.getElementById('table-tools');
+  const tblAddRowBtn = document.getElementById('tbl-add-row');
+  const tblDelRowBtn = document.getElementById('tbl-del-row');
+  const tblAddColBtn = document.getElementById('tbl-add-col');
+  const tblDelColBtn = document.getElementById('tbl-del-col');
+  const engageBtn = document.getElementById('engage-check');
+  const engageScoreEl = document.getElementById('engage-score');
+  const engageSummaryEl = document.getElementById('engage-summary');
+  const engageListEl = document.getElementById('engage-list');
 
   const regenInstructionEl = document.getElementById('regen-instruction');
   const regenStatusEl = document.getElementById('regen-status');
@@ -29,7 +53,131 @@
     window.SF.saveState(state);
   }
 
+  function setPlacement(side) {
+    if (!ensureState()) return;
+    const s = currentSlide();
+    if (s.kind !== 'content') return;
+    s.image_placement = side === 'left' ? 'left' : 'right';
+    document.getElementById('img-place-left')?.classList.toggle('active', side === 'left');
+    document.getElementById('img-place-right')?.classList.toggle('active', side === 'right');
+    persist();
+    renderActiveSlide();
+  }
+
+  let designToolbarBuilt = false;
+
+  function buildDesignToolbar() {
+    if (designToolbarBuilt) return;
+    const planGrid = document.getElementById('plan-palette-colors');
+    const slideGrid = document.getElementById('slide-override-colors');
+    if (!planGrid || !slideGrid) return;
+    designToolbarBuilt = true;
+
+    PLAN_COLOR_FIELDS.forEach(({ k, label }) => {
+      const lab = document.createElement('label');
+      lab.className = 'color-field';
+      const span = document.createElement('span');
+      span.textContent = label;
+      const inp = document.createElement('input');
+      inp.type = 'color';
+      inp.dataset.pk = k;
+      lab.appendChild(span);
+      lab.appendChild(inp);
+      planGrid.appendChild(lab);
+      inp.addEventListener('input', () => {
+        if (!ensureState()) return;
+        state.plan.palette[k] = inp.value;
+        persist();
+        refreshDesignToolbar();
+        renderActiveSlide();
+      });
+    });
+
+    SLIDE_OVERRIDE_FIELDS.forEach(({ k, label }) => {
+      const lab = document.createElement('label');
+      lab.className = 'color-field';
+      const span = document.createElement('span');
+      span.textContent = label;
+      const inp = document.createElement('input');
+      inp.type = 'color';
+      inp.dataset.sk = k;
+      lab.appendChild(span);
+      lab.appendChild(inp);
+      slideGrid.appendChild(lab);
+      inp.addEventListener('input', () => {
+        if (!ensureState()) return;
+        const s = currentSlide();
+        if (!s.style) s.style = {};
+        s.style[k] = inp.value;
+        persist();
+        renderActiveSlide();
+      });
+    });
+
+    document.getElementById('reset-slide-style')?.addEventListener('click', () => {
+      if (!ensureState()) return;
+      currentSlide().style = {};
+      persist();
+      render();
+    });
+
+    document.getElementById('img-place-left')?.addEventListener('click', () => setPlacement('left'));
+    document.getElementById('img-place-right')?.addEventListener('click', () => setPlacement('right'));
+  }
+
+  function refreshDesignToolbar() {
+    if (!state?.plan?.palette) return;
+    const note = document.getElementById('design-preset-note');
+    if (note) {
+      const pid = state.plan.design_preset || 'fresh';
+      const title = window.SF.DESIGN_PRESET_LABELS[pid] || pid;
+      note.textContent = `Активный пресет: ${title}`;
+    }
+
+    document.querySelectorAll('#plan-palette-colors input[data-pk]').forEach((el) => {
+      const k = el.dataset.pk;
+      if (!k) return;
+      el.value = window.SF.normalizeHex(state.plan.palette[k], window.SF.DEFAULT_PALETTE[k]);
+    });
+
+    const slide = currentSlide();
+    const merged = window.SF.mergeSlidePalette(state.plan.palette, slide?.style);
+
+    document.querySelectorAll('#slide-override-colors input[data-sk]').forEach((el) => {
+      const k = el.dataset.sk;
+      if (!k) return;
+      el.value = merged[k];
+    });
+
+    const placeRow = document.getElementById('image-placement-row');
+    const showPlacement = slide && slide.kind === 'content';
+    if (placeRow) placeRow.classList.toggle('hide', !showPlacement);
+
+    const pl = slide?.image_placement === 'left' ? 'left' : 'right';
+    document.getElementById('img-place-left')?.classList.toggle('active', pl === 'left');
+    document.getElementById('img-place-right')?.classList.toggle('active', pl === 'right');
+  }
+
   function normalizeSlide(slide, idx) {
+    const rawHeaders = Array.isArray(slide?.headers) ? slide.headers.map(String) : [];
+    let rows = Array.isArray(slide?.rows)
+      ? slide.rows.map((r) => (Array.isArray(r) ? r.map(String) : []))
+      : [];
+    if (rawHeaders.length) {
+      const n = rawHeaders.length;
+      rows = rows.map((r) => {
+        const out = r.slice(0, n);
+        while (out.length < n) out.push('');
+        return out;
+      });
+    }
+    const placing = String(slide?.image_placement || 'right').toLowerCase();
+
+    const rawStyle =
+      slide?.style && typeof slide.style === 'object' && !Array.isArray(slide.style)
+        ? { ...slide.style }
+        : {};
+
     return {
       kind: String(slide?.kind || (idx === 0 ? 'title' : 'content')),
       title: String(slide?.title || `Слайд ${idx + 1}`),
@@ -39,6 +187,10 @@
       image_prompt: String(slide?.image_prompt || ''),
       image_data_url: String(slide?.image_data_url || ''),
       notes: String(slide?.notes || ''),
+      headers: rawHeaders,
+      rows,
+      style: rawStyle,
+      image_placement: placing === 'left' ? 'left' : 'right',
     };
   }
 
@@ -49,6 +201,19 @@
       return false;
     }
     state.plan.slides = state.plan.slides.map(normalizeSlide);
+    const D = window.SF.DEFAULT_PALETTE;
+    if (!state.plan.palette || typeof state.plan.palette !== 'object') {
+      state.plan.palette = { ...D };
+    } else {
+      Object.keys(D).forEach((k) => {
+        if (!state.plan.palette[k]) state.plan.palette[k] = D[k];
+      });
+    }
+    if (!state.plan.design_preset) state.plan.design_preset = 'fresh';
+    if (state.engagement && Array.isArray(state.engagement.slides)) {
+      if (state.engagement.slides.length !== state.plan.slides.length) state.engagement = null;
+    }
+
     if (state.selectedIndex == null || state.selectedIndex < 0) state.selectedIndex = 0;
     if (state.selectedIndex > state.plan.slides.length - 1) state.selectedIndex = state.plan.slides.length - 1;
     editorEmptyEl.classList.add('hide');
@@ -60,6 +225,40 @@
     return state.plan.slides[state.selectedIndex];
   }
 
+  function getSlideRisk(idx) {
+    const rows = state?.engagement?.slides;
+    if (!Array.isArray(rows)) return '';
+    const item = rows.find((x) => Number(x.slide_index) === idx);
+    return item?.risk_level || '';
+  }
+
+  function renderEngagementPanel() {
+    if (!engageScoreEl || !engageSummaryEl || !engageListEl) return;
+    const e = state?.engagement;
+    if (!e || !Array.isArray(e.slides) || !e.slides.length) {
+      engageScoreEl.textContent = 'Пока нет анализа.';
+      engageSummaryEl.textContent = 'Запустите проверку, чтобы найти самые скучные слайды и получить улучшения.';
+      engageListEl.innerHTML = '';
+      return;
+    }
+    engageScoreEl.textContent = `Индекс скуки: ${e.deck_score}% · критичных: ${e.critical_slides}, высоких: ${e.high_slides}`;
+    engageSummaryEl.textContent = e.summary || '';
+    const top = Array.isArray(e.top_risks) ? e.top_risks : [];
+    engageListEl.innerHTML = '';
+    top.forEach((item) => {
+      const card = document.createElement('article');
+      card.className = 'engage-card';
+      const risk = String(item.risk_level || 'low');
+      const rec = Array.isArray(item.recommendations) ? item.recommendations.slice(0, 2) : [];
+      card.innerHTML = `
+        <div><strong>#${Number(item.slide_index) + 1} ${window.SF.escapeHtml(item.title || '')}</strong></div>
+        <div class="risk risk-${risk}">${window.SF.escapeHtml(item.verdict || '')}</div>
+        <div class="hint">${window.SF.escapeHtml(rec.join(' / ') || 'Добавьте интерактив и сократите текст.')}</div>
+      `;
+      engageListEl.appendChild(card);
+    });
+  }
+
   function refreshHeader() {
     editorTitleEl.textContent = state.plan.title || 'Визуальный редактор';
     editorSubEl.textContent = `${state.plan.slides.length} слайдов · редактируйте напрямую в макете`;
@@ -68,6 +267,17 @@
 
   function refreshKindControl() {
     kindEl.value = currentSlide().kind;
+    refreshKindToolbar();
+  }
+
+  function refreshKindToolbar() {
+    const k = currentSlide().kind;
+    const isTable = k === 'table';
+    if (tableToolsEl) tableToolsEl.style.display = isTable ? '' : 'none';
+    if (addBulletBtn) addBulletBtn.style.display = isTable || k === 'title' || k === 'section' ? 'none' : '';
+    const showImage = !isTable && k !== 'title' && k !== 'section' && k !== 'conclusion';
+    if (changeImageBtn) changeImageBtn.style.display = showImage ? '' : 'none';
+    if (clearImageBtn) clearImageBtn.style.display = showImage ? '' : 'none';
   }
 
   function makeEditable(tag, className, value, onInput, placeholder) {
@@ -88,9 +298,10 @@
   function renderSlideList() {
     listEl.innerHTML = '';
     state.plan.slides.forEach((slide, idx) => {
+      const risk = getSlideRisk(idx);
       const chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = `slide-chip${idx === state.selectedIndex ? ' active' : ''}`;
+      chip.className = `slide-chip${idx === state.selectedIndex ? ' active' : ''}${risk ? ` risk-${risk}` : ''}`;
       chip.innerHTML = `
         <div class="chip-thumb kind-${slide.kind}">
           ${slide.image_data_url ? `<img src="${slide.image_data_url}" alt="thumb" />` : ''}
@@ -154,14 +365,16 @@
     return wrap;
   }
 
-  function applyPalette(canvas, palette) {
-    const p = palette || {};
+  function applyPalette(canvas, slide) {
+    const merged = window.SF.mergeSlidePalette(state.plan.palette, slide.style);
     const map = {
-      '--p-bg': p.background || '#FFFFFF',
-      '--p-primary': p.primary || '#1F2937',
-      '--p-accent': p.accent || '#6366F1',
-      '--p-text': p.text || '#111827',
-      '--p-muted': p.muted || '#6B7280',
+      '--p-bg': merged.background,
+      '--p-primary': merged.primary,
+      '--p-accent': merged.accent,
+      '--p-accent2': merged.accent2,
+      '--p-surface': merged.surface,
+      '--p-text': merged.text,
+      '--p-muted': merged.muted,
     };
     Object.entries(map).forEach(([k, v]) => canvas.style.setProperty(k, v));
   }
@@ -203,7 +416,7 @@
 
     const canvas = document.createElement('div');
     canvas.className = `slide-canvas kind-${slide.kind}`;
-    applyPalette(canvas, state.plan.palette);
+    applyPalette(canvas, slide);
 
     if (slide.kind === 'title') {
       const barTop = document.createElement('div');
@@ -251,6 +464,67 @@
 
       canvas.appendChild(barTop);
       canvas.appendChild(concl);
+      wrapper.appendChild(canvas);
+      return wrapper;
+    }
+
+    if (slide.kind === 'table') {
+      const accent = document.createElement('div');
+      accent.className = 'left-accent';
+
+      const frame = document.createElement('div');
+      frame.className = 'content-frame';
+
+      const head = document.createElement('div');
+      head.className = 'content-head';
+      head.appendChild(makeEditable('h1', 'content-title', slide.title, (v) => { slide.title = v; }, 'Заголовок'));
+      const underline = document.createElement('div');
+      underline.className = 'title-underline';
+      head.appendChild(underline);
+      head.appendChild(makeEditable('p', 'content-subtitle', slide.subtitle, (v) => { slide.subtitle = v; }, 'Подзаголовок (необязательно)'));
+      frame.appendChild(head);
+
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'canvas-table-wrap';
+
+      const headers = slide.headers && slide.headers.length ? slide.headers : ['Колонка 1', 'Колонка 2'];
+      if (!slide.headers || !slide.headers.length) slide.headers = [...headers];
+      const rows = slide.rows && slide.rows.length ? slide.rows : [['', ''], ['', '']];
+      if (!slide.rows || !slide.rows.length) slide.rows = rows.map((r) => [...r]);
+
+      const table = document.createElement('table');
+      table.className = 'canvas-table';
+
+      const thead = document.createElement('thead');
+      const trh = document.createElement('tr');
+      slide.headers.forEach((h, ci) => {
+        const th = document.createElement('th');
+        th.appendChild(makeEditable('span', 'table-cell-h', h, (v) => { slide.headers[ci] = v; }, 'Заголовок'));
+        trh.appendChild(th);
+      });
+      thead.appendChild(trh);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      slide.rows.forEach((row, ri) => {
+        const tr = document.createElement('tr');
+        for (let ci = 0; ci < slide.headers.length; ci += 1) {
+          const td = document.createElement('td');
+          const value = row[ci] != null ? row[ci] : '';
+          td.appendChild(makeEditable('span', 'table-cell', value, (v) => {
+            if (!slide.rows[ri]) slide.rows[ri] = [];
+            slide.rows[ri][ci] = v;
+          }, ''));
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      tableWrap.appendChild(table);
+      frame.appendChild(tableWrap);
+
+      canvas.appendChild(accent);
+      canvas.appendChild(frame);
       wrapper.appendChild(canvas);
       return wrapper;
     }
@@ -319,7 +593,9 @@
 
     const body = document.createElement('div');
     const hasImage = !!(slide.image_data_url || slide.image_prompt);
-    body.className = `content-body-row${hasImage ? ' with-image' : ''}`;
+    const imageLeft =
+      slide.kind === 'content' && hasImage && (slide.image_placement || 'right') === 'left';
+    body.className = `content-body-row${hasImage ? ' with-image' : ''}${imageLeft ? ' image-left' : ''}`;
 
     const text = document.createElement('div');
     text.className = 'content-text';
@@ -354,9 +630,12 @@
   }
 
   function render() {
+    buildDesignToolbar();
     if (!ensureState()) return;
     refreshHeader();
     refreshKindControl();
+    refreshDesignToolbar();
+    renderEngagementPanel();
     renderSlideList();
     renderActiveSlide();
   }
@@ -376,7 +655,16 @@
 
   addSlideBtn.addEventListener('click', () => {
     if (!ensureState()) return;
-    const next = normalizeSlide({ kind: 'content', title: `Новый слайд ${state.plan.slides.length + 1}`, bullets: ['Новый пункт'] }, state.plan.slides.length);
+    const next = normalizeSlide(
+      {
+        kind: 'content',
+        title: `Новый слайд ${state.plan.slides.length + 1}`,
+        bullets: ['Новый пункт'],
+        style: {},
+        image_placement: 'right',
+      },
+      state.plan.slides.length,
+    );
     state.plan.slides.push(next);
     state.selectedIndex = state.plan.slides.length - 1;
     persist();
@@ -407,7 +695,12 @@
 
   kindEl.addEventListener('change', () => {
     if (!ensureState()) return;
-    currentSlide().kind = kindEl.value;
+    const slide = currentSlide();
+    slide.kind = kindEl.value;
+    if (slide.kind === 'table' && (!slide.headers || !slide.headers.length)) {
+      slide.headers = ['Параметр', 'Значение'];
+      slide.rows = [['', ''], ['', ''], ['', '']];
+    }
     persist();
     render();
   });
@@ -418,6 +711,54 @@
     persist();
     render();
   });
+
+  if (tblAddRowBtn) {
+    tblAddRowBtn.addEventListener('click', () => {
+      if (!ensureState()) return;
+      const s = currentSlide();
+      if (s.kind !== 'table') return;
+      const n = (s.headers && s.headers.length) || 2;
+      if (!s.rows) s.rows = [];
+      if (s.rows.length >= 8) return;
+      s.rows.push(new Array(n).fill(''));
+      persist();
+      render();
+    });
+  }
+  if (tblDelRowBtn) {
+    tblDelRowBtn.addEventListener('click', () => {
+      if (!ensureState()) return;
+      const s = currentSlide();
+      if (s.kind !== 'table' || !s.rows || s.rows.length <= 1) return;
+      s.rows.pop();
+      persist();
+      render();
+    });
+  }
+  if (tblAddColBtn) {
+    tblAddColBtn.addEventListener('click', () => {
+      if (!ensureState()) return;
+      const s = currentSlide();
+      if (s.kind !== 'table') return;
+      if (!s.headers) s.headers = [];
+      if (s.headers.length >= 6) return;
+      s.headers.push(`Колонка ${s.headers.length + 1}`);
+      s.rows = (s.rows || []).map((r) => [...r, '']);
+      persist();
+      render();
+    });
+  }
+  if (tblDelColBtn) {
+    tblDelColBtn.addEventListener('click', () => {
+      if (!ensureState()) return;
+      const s = currentSlide();
+      if (s.kind !== 'table' || !s.headers || s.headers.length <= 2) return;
+      s.headers.pop();
+      s.rows = (s.rows || []).map((r) => r.slice(0, s.headers.length));
+      persist();
+      render();
+    });
+  }
 
   changeImageBtn.addEventListener('click', () => {
     if (!ensureState()) return;
@@ -448,6 +789,28 @@
       render();
     };
     reader.readAsDataURL(file);
+  });
+
+  engageBtn?.addEventListener('click', async () => {
+    if (!ensureState()) return;
+    engageBtn.disabled = true;
+    engageBtn.textContent = 'Считаем риск скуки...';
+    if (engageSummaryEl) engageSummaryEl.textContent = 'Анализируем перегруженные слайды...';
+    try {
+      const data = await window.SF.apiJson('/api/engagement-heatmap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: state.plan }),
+      });
+      state.engagement = data;
+      persist();
+      render();
+    } catch (e) {
+      if (engageSummaryEl) engageSummaryEl.textContent = e.message || String(e);
+    } finally {
+      engageBtn.disabled = false;
+      engageBtn.textContent = 'Анти‑Душнила анализ';
+    }
   });
 
   regenBtn.addEventListener('click', async () => {

@@ -90,6 +90,61 @@
     }
   }
 
+  /** Совпадает с backend/design_presets.PRESET_PALETTES[fresh]. */
+  const DEFAULT_PALETTE = {
+    primary: '#1E293B',
+    accent: '#6366F1',
+    accent2: '#8B5CF6',
+    background: '#F1F5F9',
+    surface: '#FFFFFF',
+    text: '#334155',
+    muted: '#64748B',
+  };
+
+  function normalizeHex(raw, fallback) {
+    let s = String(raw || '').trim().replace(/^#/, '');
+    if (!/^[0-9A-Fa-f]{6}$/.test(s)) return fallback.startsWith('#') ? fallback : `#${fallback}`;
+    return `#${s.toUpperCase()}`;
+  }
+
+  function mergeSlidePalette(planPalette, slideStyle) {
+    const out = { ...DEFAULT_PALETTE, ...(planPalette || {}) };
+    Object.keys(DEFAULT_PALETTE).forEach((k) => {
+      if (out[k]) out[k] = normalizeHex(out[k], DEFAULT_PALETTE[k]);
+    });
+    if (!slideStyle || typeof slideStyle !== 'object') return out;
+    const keyMap = {
+      primary: 'primary',
+      accent: 'accent',
+      accent2: 'accent2',
+      background: 'background',
+      surface: 'surface',
+      text: 'text',
+      muted: 'muted',
+      bg: 'background',
+      title_color: 'primary',
+      body_color: 'text',
+    };
+    Object.keys(slideStyle).forEach((k) => {
+      const target = keyMap[k] || (k in out ? k : '');
+      if (!target) return;
+      const cur = out[target] || DEFAULT_PALETTE[target];
+      const next = normalizeHex(slideStyle[k], cur);
+      if (next.length === 7) out[target] = next;
+    });
+    return out;
+  }
+
+  /** Подписи пресетов (как в backend/design_presets.PRESET_LABELS_RU). */
+  const DESIGN_PRESET_LABELS = {
+    fresh: 'Свежее (slate / indigo)',
+    ocean: 'Океан (голубой)',
+    sunrise: 'Рассвет (оранж / розовый)',
+    midnight: 'Полночь (тёмный)',
+    pastel: 'Пастель (лаванда)',
+    forest: 'Лес (зелёный)',
+  };
+
   window.SF = {
     saveState,
     loadState,
@@ -101,5 +156,9 @@
     parseSeg,
     setupSeg,
     pollJob,
+    DEFAULT_PALETTE,
+    normalizeHex,
+    mergeSlidePalette,
+    DESIGN_PRESET_LABELS,
   };
 })();

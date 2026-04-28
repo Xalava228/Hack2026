@@ -8,16 +8,57 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
+from PIL import Image as PILImage
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
+from .design_presets import merge_slide_palette
 from .slide_planner import PresentationPlan, SlideSpec
 
 SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
+
+
+def _slide_palette(plan: PresentationPlan, spec: SlideSpec) -> dict[str, str]:
+    return merge_slide_palette(plan.palette, getattr(spec, "style", None) or {})
+
+
+def _preset_pid(plan: PresentationPlan) -> str:
+    return getattr(plan, "design_preset", None) or "fresh"
+
+
+def _decorate_modern_title(slide, pal: dict[str, str], pid: str) -> None:
+    """Декор титульного слайда: лёгкий акцент справа сверху."""
+    a2 = pal.get("accent2", pal["accent"])
+    orb = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(10.6), Inches(0.35), Inches(2.9), Inches(2.9))
+    orb.fill.solid()
+    orb.fill.fore_color.rgb = _hex(a2)
+    orb.line.fill.background()
+    orb.shadow.inherit = False
+    if pid != "midnight":
+        stripe = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(5.5), Inches(4.2), Inches(0.14))
+        _set_solid_fill(stripe, pal["accent"])
+        stripe.shadow.inherit = False
+
+
+def _decorate_content_header(slide, pal: dict[str, str], pid: str) -> None:
+    """Шапка контентного слайда: тонкая верхняя линия акцентом, пятно accent2."""
+    a2 = pal.get("accent2", pal["accent"])
+    top_band = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, SLIDE_W, Inches(0.06))
+    _set_solid_fill(top_band, a2)
+    top_band.shadow.inherit = False
+    if pid not in ("midnight",):
+        spot = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(11.2), Inches(0.35), Inches(1.9), Inches(1.9))
+        spot.fill.solid()
+        spot.fill.fore_color.rgb = _hex(a2)
+        spot.line.fill.background()
+
+
+def _accent_bar_width(pid: str):
+    return Inches(0.22) if pid in ("ocean", "fresh", "sunrise") else Inches(0.16)
 
 
 def _hex(value: str) -> RGBColor:
@@ -117,18 +158,107 @@ def _add_bullets(
 
 
 def _add_image(slide, image_bytes: bytes, left, top, width, height) -> None:
+    try:
+        with PILImage.open(io.BytesIO(image_bytes)) as im:
+            iw, ih = im.size
+    except Exception:
+        return
+
+    box_w = int(width)
+    box_h = int(height)
+    if iw <= 0 or ih <= 0 or box_w <= 0 or box_h <= 0:
+        return
+
+    ratio = min(box_w / iw, box_h / ih)
+    draw_w = int(iw * ratio)
+    draw_h = int(ih * ratio)
+    draw_left = int(left) + (box_w - draw_w) // 2
+    draw_top = int(top) + (box_h - draw_h) // 2
+
     bio = io.BytesIO(image_bytes)
-    pic = slide.shapes.add_picture(bio, left, top, width=width, height=height)
+    pic = slide.shapes.add_picture(
+        bio,
+        Emu(draw_left),
+        Emu(draw_top),
+        width=Emu(draw_w),
+        height=Emu(draw_h),
+    )
     pic.shadow.inherit = False
 
 
+def _add_table(
+    slide,
+    left,
+    top,
+    width,
+    height,
+    headers: list[str],
+    rows: list[list[str]],
+    *,
+    palette: dict[str, str],
+) -> None:
+    if not headers:
+        return
+    n_cols = len(headers)
+    n_rows = len(rows) + 1  # +1 на шапку
+
+    table_shape = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
+    table = table_shape.table
+
+    # Шапка
+    for c, header in enumerate(headers):
+        cell = table.cell(0, c)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = _hex(palette["primary"])
+        tf = cell.text_frame
+        tf.word_wrap = True
+        tf.margin_left = Inches(0.08)
+        tf.margin_right = Inches(0.08)
+        tf.margin_top = Inches(0.04)
+        tf.margin_bottom = Inches(0.04)
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.LEFT
+        run = p.add_run()
+        run.text = str(header)
+        run.font.name = "Calibri"
+        run.font.size = Pt(15)
+        run.font.bold = True
+        run.font.color.rgb = _hex(palette["background"])
+
+    # Данные
+    body_text = _hex(palette["text"])
+    band_color_a = _hex(palette["background"])
+    band_color_b = _hex("#F4F6FA")
+    for r, row in enumerate(rows, start=1):
+        for c in range(n_cols):
+            cell = table.cell(r, c)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = band_color_a if r % 2 == 1 else band_color_b
+            tf = cell.text_frame
+            tf.word_wrap = True
+            tf.margin_left = Inches(0.08)
+            tf.margin_right = Inches(0.08)
+            tf.margin_top = Inches(0.03)
+            tf.margin_bottom = Inches(0.03)
+            p = tf.paragraphs[0]
+            p.alignment = PP_ALIGN.LEFT
+            run = p.add_run()
+            run.text = str(row[c]) if c < len(row) else ""
+            run.font.name = "Calibri"
+            run.font.size = Pt(13)
+            run.font.color.rgb = body_text
+
+
 def _render_title(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) -> None:
+    pid = _preset_pid(plan)
+    pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
-    _add_background(slide, plan.palette["background"])
-    _add_accent_bar(slide, plan.palette["accent"], 0, 0, SLIDE_W, Inches(0.25))
+    _add_background(slide, pal["background"])
+    _decorate_modern_title(slide, pal, pid)
+    _add_accent_bar(slide, pal["accent"], 0, 0, SLIDE_W, Inches(0.22))
     _add_accent_bar(
-        slide, plan.palette["accent"], 0, SLIDE_H - Inches(0.25), SLIDE_W, Inches(0.25)
+        slide, pal["accent"], 0, SLIDE_H - Inches(0.22), SLIDE_W, Inches(0.22)
     )
 
     _add_textbox(
@@ -138,7 +268,7 @@ def _render_title(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) ->
         SLIDE_W - Inches(1.8),
         Inches(2.0),
         spec.title or plan.title,
-        color=plan.palette["primary"],
+        color=pal["primary"],
         size=54,
         bold=True,
         align="center",
@@ -151,16 +281,17 @@ def _render_title(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) ->
             SLIDE_W - Inches(1.8),
             Inches(1.2),
             spec.subtitle or plan.subtitle,
-            color=plan.palette["muted"],
+            color=pal["muted"],
             size=24,
             align="center",
         )
 
 
 def _render_section(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) -> None:
+    pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
-    _add_background(slide, plan.palette["primary"])
+    _add_background(slide, pal["primary"])
     _add_textbox(
         slide,
         Inches(1.0),
@@ -168,7 +299,7 @@ def _render_section(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) 
         SLIDE_W - Inches(2.0),
         Inches(1.6),
         spec.title,
-        color=plan.palette["background"],
+        color=pal["background"],
         size=48,
         bold=True,
         align="center",
@@ -181,7 +312,7 @@ def _render_section(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) 
             SLIDE_W - Inches(2.0),
             Inches(1.0),
             spec.subtitle,
-            color=plan.palette["accent"],
+            color=pal["accent"],
             size=24,
             align="center",
         )
@@ -193,10 +324,14 @@ def _render_content(
     spec: SlideSpec,
     image: bytes | None,
 ) -> None:
+    pid = _preset_pid(plan)
+    pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
-    _add_background(slide, plan.palette["background"])
-    _add_accent_bar(slide, plan.palette["accent"])
+    _add_background(slide, pal["background"])
+    _decorate_content_header(slide, pal, pid)
+    wbar = _accent_bar_width(pid)
+    _add_accent_bar(slide, pal["accent"], 0, 0, wbar, SLIDE_H)
 
     title_left = Inches(0.7)
     title_top = Inches(0.5)
@@ -207,7 +342,7 @@ def _render_content(
         SLIDE_W - Inches(1.4),
         Inches(0.9),
         spec.title,
-        color=plan.palette["primary"],
+        color=pal["primary"],
         size=32,
         bold=True,
     )
@@ -215,18 +350,35 @@ def _render_content(
         MSO_SHAPE.RECTANGLE,
         title_left,
         Inches(1.45),
-        Inches(1.2),
+        Inches(1.35),
         Emu(38100),
     )
-    _set_solid_fill(underline, plan.palette["accent"])
+    _set_solid_fill(underline, pal["accent"])
 
     has_image = image is not None
+    left_img = has_image and getattr(spec, "image_placement", "right") == "left"
     text_left = Inches(0.7)
     text_top = Inches(1.7)
     text_height = SLIDE_H - text_top - Inches(0.5)
     text_width = SLIDE_W - Inches(1.4)
+    img_left = Inches(7.4)
+    img_top = Inches(1.65)
+    img_w = SLIDE_W - img_left - Inches(0.5)
+    img_h = SLIDE_H - img_top - Inches(0.5)
     if has_image:
-        text_width = Inches(6.4)
+        if left_img:
+            img_left = Inches(0.65)
+            img_top = Inches(1.65)
+            img_w = Inches(6.35)
+            img_h = SLIDE_H - img_top - Inches(0.5)
+            text_left = Inches(7.45)
+            text_width = SLIDE_W - text_left - Inches(0.55)
+        else:
+            text_width = Inches(6.4)
+            img_left = Inches(7.4)
+            img_top = Inches(1.7)
+            img_w = SLIDE_W - img_left - Inches(0.5)
+            img_h = SLIDE_H - img_top - Inches(0.5)
 
     if spec.bullets:
         _add_bullets(
@@ -236,8 +388,8 @@ def _render_content(
             text_width,
             text_height,
             spec.bullets,
-            color=plan.palette["text"],
-            accent=plan.palette["accent"],
+            color=pal["text"],
+            accent=pal["accent"],
             size=20,
         )
     elif spec.body:
@@ -248,15 +400,11 @@ def _render_content(
             text_width,
             text_height,
             spec.body,
-            color=plan.palette["text"],
+            color=pal["text"],
             size=18,
         )
 
     if has_image:
-        img_left = Inches(7.4)
-        img_top = Inches(1.7)
-        img_w = SLIDE_W - img_left - Inches(0.5)
-        img_h = SLIDE_H - img_top - Inches(0.5)
         _add_image(slide, image, img_left, img_top, img_w, img_h)
 
 
@@ -266,10 +414,14 @@ def _render_two_column(
     spec: SlideSpec,
     image: bytes | None,
 ) -> None:
+    pid = _preset_pid(plan)
+    pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
-    _add_background(slide, plan.palette["background"])
-    _add_accent_bar(slide, plan.palette["accent"])
+    _add_background(slide, pal["background"])
+    _decorate_content_header(slide, pal, pid)
+    wbar = _accent_bar_width(pid)
+    _add_accent_bar(slide, pal["accent"], 0, 0, wbar, SLIDE_H)
 
     _add_textbox(
         slide,
@@ -278,7 +430,7 @@ def _render_two_column(
         SLIDE_W - Inches(1.4),
         Inches(0.9),
         spec.title,
-        color=plan.palette["primary"],
+        color=pal["primary"],
         size=32,
         bold=True,
     )
@@ -295,8 +447,8 @@ def _render_two_column(
         half,
         SLIDE_H - Inches(2.2),
         left_b,
-        color=plan.palette["text"],
-        accent=plan.palette["accent"],
+        color=pal["text"],
+        accent=pal["accent"],
         size=20,
     )
     if right_b:
@@ -307,8 +459,8 @@ def _render_two_column(
             half,
             SLIDE_H - Inches(2.2),
             right_b,
-            color=plan.palette["text"],
-            accent=plan.palette["accent"],
+            color=pal["text"],
+            accent=pal["accent"],
             size=20,
         )
     elif image is not None:
@@ -322,13 +474,79 @@ def _render_two_column(
         )
 
 
+def _render_table_slide(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) -> None:
+    pid = _preset_pid(plan)
+    pal = _slide_palette(plan, spec)
+    blank = prs.slide_layouts[6]
+    slide = prs.slides.add_slide(blank)
+    _add_background(slide, pal["background"])
+    _decorate_content_header(slide, pal, pid)
+    wbar = _accent_bar_width(pid)
+    _add_accent_bar(slide, pal["accent"], 0, 0, wbar, SLIDE_H)
+
+    title_left = Inches(0.7)
+    _add_textbox(
+        slide,
+        title_left,
+        Inches(0.5),
+        SLIDE_W - Inches(1.4),
+        Inches(0.9),
+        spec.title,
+        color=pal["primary"],
+        size=32,
+        bold=True,
+    )
+    underline = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        title_left,
+        Inches(1.45),
+        Inches(1.35),
+        Emu(38100),
+    )
+    _set_solid_fill(underline, pal["accent"])
+
+    if spec.subtitle:
+        _add_textbox(
+            slide,
+            title_left,
+            Inches(1.55),
+            SLIDE_W - Inches(1.4),
+            Inches(0.5),
+            spec.subtitle,
+            color=pal["muted"],
+            size=15,
+        )
+
+    table_top = Inches(2.2) if spec.subtitle else Inches(1.85)
+    table_height = SLIDE_H - table_top - Inches(0.6)
+    table_width = SLIDE_W - Inches(1.4)
+
+    if spec.headers and spec.rows:
+        _add_table(
+            slide,
+            title_left,
+            table_top,
+            table_width,
+            table_height,
+            spec.headers,
+            spec.rows,
+            palette=pal,
+        )
+
+
 def _render_conclusion(
     prs: Presentation, plan: PresentationPlan, spec: SlideSpec
 ) -> None:
+    pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
-    _add_background(slide, plan.palette["background"])
-    _add_accent_bar(slide, plan.palette["accent"], 0, 0, SLIDE_W, Inches(0.25))
+    _add_background(slide, pal["background"])
+    _add_accent_bar(slide, pal["accent"], 0, 0, SLIDE_W, Inches(0.22))
+    a2 = pal.get("accent2", pal["accent"])
+    spot = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(11.0), Inches(0.45), Inches(1.6), Inches(1.6))
+    spot.fill.solid()
+    spot.fill.fore_color.rgb = _hex(a2)
+    spot.line.fill.background()
 
     _add_textbox(
         slide,
@@ -337,7 +555,7 @@ def _render_conclusion(
         SLIDE_W - Inches(1.8),
         Inches(1.2),
         spec.title or "Выводы",
-        color=plan.palette["primary"],
+        color=pal["primary"],
         size=40,
         bold=True,
         align="center",
@@ -351,8 +569,8 @@ def _render_conclusion(
             SLIDE_W - Inches(3.0),
             Inches(4.0),
             spec.bullets,
-            color=plan.palette["text"],
-            accent=plan.palette["accent"],
+            color=pal["text"],
+            accent=pal["accent"],
             size=22,
         )
     elif spec.body:
@@ -363,7 +581,7 @@ def _render_conclusion(
             SLIDE_W - Inches(3.0),
             Inches(4.0),
             spec.body,
-            color=plan.palette["text"],
+            color=pal["text"],
             size=22,
             align="center",
         )
@@ -376,7 +594,7 @@ def _render_conclusion(
             SLIDE_W - Inches(1.8),
             Inches(0.6),
             spec.subtitle,
-            color=plan.palette["muted"],
+            color=pal["muted"],
             size=18,
             align="center",
         )
@@ -402,6 +620,8 @@ def build_pptx(
             _render_two_column(prs, plan, spec, img)
         elif spec.kind == "conclusion":
             _render_conclusion(prs, plan, spec)
+        elif spec.kind == "table":
+            _render_table_slide(prs, plan, spec)
         else:
             _render_content(prs, plan, spec, img)
 

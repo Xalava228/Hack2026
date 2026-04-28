@@ -12,6 +12,19 @@
 
   window.SF.setupSeg();
 
+  const densityHintEl = document.getElementById('density-hint');
+  function refreshDensityHint() {
+    const seg = document.querySelector('.seg[data-name="text_density"] button.active');
+    if (seg && densityHintEl) {
+      const h = seg.getAttribute('data-hint') || '';
+      if (h) densityHintEl.textContent = h;
+    }
+  }
+  document.querySelectorAll('.seg[data-name="text_density"] button').forEach((b) => {
+    b.addEventListener('click', () => setTimeout(refreshDensityHint, 0));
+  });
+  refreshDensityHint();
+
   const baseSuggestions = [
     'Лекция о лягушках для познавательных второклассников',
     'Семинар по психологии принятия решений в команде',
@@ -105,6 +118,7 @@
       images_mode: window.SF.parseSeg('images_mode'),
       image_backend: window.SF.parseSeg('image_backend'),
       output_format: window.SF.parseSeg('output_format'),
+      design_preset: (document.getElementById('design_preset') || {}).value || 'fresh',
     };
     if (!payload.prompt || payload.prompt.length < 3) {
       hintEl.textContent = 'Введите более подробный запрос (минимум 3 символа).';

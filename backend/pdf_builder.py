@@ -14,11 +14,17 @@ from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+from reportlab.platypus import Table, TableStyle
 
+from .design_presets import merge_slide_palette
 from .slide_planner import PresentationPlan, SlideSpec
 
 PAGE_W = 13.333 * inch
 PAGE_H = 7.5 * inch
+
+
+def _pdf_pal(plan: PresentationPlan, spec: SlideSpec) -> dict[str, str]:
+    return merge_slide_palette(plan.palette, getattr(spec, "style", None) or {})
 
 
 def _wrap_text(text: str, max_chars: int) -> list[str]:
@@ -179,9 +185,10 @@ def _draw_image(c: canvas.Canvas, img_bytes: bytes, x, y, w, h) -> None:
 
 
 def _render_title(c: canvas.Canvas, plan: PresentationPlan, spec: SlideSpec) -> None:
-    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, plan.palette["background"])
-    _draw_filled_rect(c, 0, PAGE_H - 0.25 * inch, PAGE_W, 0.25 * inch, plan.palette["accent"])
-    _draw_filled_rect(c, 0, 0, PAGE_W, 0.25 * inch, plan.palette["accent"])
+    pal = _pdf_pal(plan, spec)
+    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, pal["background"])
+    _draw_filled_rect(c, 0, PAGE_H - 0.25 * inch, PAGE_W, 0.25 * inch, pal["accent"])
+    _draw_filled_rect(c, 0, 0, PAGE_W, 0.25 * inch, pal["accent"])
 
     title = spec.title or plan.title
     _draw_text(
@@ -189,7 +196,7 @@ def _render_title(c: canvas.Canvas, plan: PresentationPlan, spec: SlideSpec) -> 
         title,
         0.9 * inch,
         PAGE_H - 3.6 * inch,
-        color=plan.palette["primary"],
+        color=pal["primary"],
         size=42,
         bold=True,
         align="center",
@@ -202,7 +209,7 @@ def _render_title(c: canvas.Canvas, plan: PresentationPlan, spec: SlideSpec) -> 
             sub,
             0.9 * inch,
             PAGE_H - 4.6 * inch,
-            color=plan.palette["muted"],
+            color=pal["muted"],
             size=20,
             align="center",
             max_width=PAGE_W - 1.8 * inch,
@@ -210,13 +217,14 @@ def _render_title(c: canvas.Canvas, plan: PresentationPlan, spec: SlideSpec) -> 
 
 
 def _render_section(c: canvas.Canvas, plan: PresentationPlan, spec: SlideSpec) -> None:
-    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, plan.palette["primary"])
+    pal = _pdf_pal(plan, spec)
+    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, pal["primary"])
     _draw_text(
         c,
         spec.title,
         0.9 * inch,
         PAGE_H / 2,
-        color=plan.palette["background"],
+        color=pal["background"],
         size=40,
         bold=True,
         align="center",
@@ -228,7 +236,7 @@ def _render_section(c: canvas.Canvas, plan: PresentationPlan, spec: SlideSpec) -
             spec.subtitle,
             0.9 * inch,
             PAGE_H / 2 - 0.9 * inch,
-            color=plan.palette["accent"],
+            color=pal["accent"],
             size=20,
             align="center",
             max_width=PAGE_W - 1.8 * inch,
@@ -241,27 +249,40 @@ def _render_content(
     spec: SlideSpec,
     image: bytes | None,
 ) -> None:
-    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, plan.palette["background"])
-    _draw_filled_rect(c, 0, 0, 0.18 * inch, PAGE_H, plan.palette["accent"])
+    pal = _pdf_pal(plan, spec)
+    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, pal["background"])
+    _draw_filled_rect(c, 0, 0, 0.18 * inch, PAGE_H, pal["accent"])
 
     _draw_text(
         c,
         spec.title,
         0.7 * inch,
         PAGE_H - 1.0 * inch,
-        color=plan.palette["primary"],
+        color=pal["primary"],
         size=28,
         bold=True,
         max_width=PAGE_W - 1.4 * inch,
     )
-    _draw_filled_rect(c, 0.7 * inch, PAGE_H - 1.15 * inch, 1.2 * inch, 0.05 * inch, plan.palette["accent"])
+    _draw_filled_rect(c, 0.7 * inch, PAGE_H - 1.15 * inch, 1.2 * inch, 0.05 * inch, pal["accent"])
 
     has_image = image is not None
+    left_img = has_image and getattr(spec, "image_placement", "right") == "left"
     text_x = 0.7 * inch
     text_y = PAGE_H - 1.6 * inch
     text_w = PAGE_W - 1.4 * inch
+    img_x = 7.4 * inch
+    img_y = 0.5 * inch
+    img_w = PAGE_W - img_x - 0.5 * inch
+    img_h = PAGE_H - 2.0 * inch
     if has_image:
-        text_w = 6.4 * inch
+        if left_img:
+            img_x = 0.65 * inch
+            img_w = 6.35 * inch
+            img_h = PAGE_H - 2.0 * inch
+            text_x = 7.45 * inch
+            text_w = PAGE_W - text_x - 0.55 * inch
+        else:
+            text_w = 6.4 * inch
 
     if spec.bullets:
         _draw_bullets(
@@ -270,8 +291,8 @@ def _render_content(
             text_x,
             text_y,
             width=text_w,
-            color=plan.palette["text"],
-            accent=plan.palette["accent"],
+            color=pal["text"],
+            accent=pal["accent"],
             size=16,
         )
     elif spec.body:
@@ -280,16 +301,12 @@ def _render_content(
             spec.body,
             text_x,
             text_y,
-            color=plan.palette["text"],
+            color=pal["text"],
             size=15,
             max_width=text_w,
         )
 
     if has_image:
-        img_x = 7.4 * inch
-        img_y = 0.5 * inch
-        img_w = PAGE_W - img_x - 0.5 * inch
-        img_h = PAGE_H - 2.0 * inch
         _draw_image(c, image, img_x, img_y, img_w, img_h)
 
 
@@ -299,14 +316,15 @@ def _render_two_column(
     spec: SlideSpec,
     image: bytes | None,
 ) -> None:
-    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, plan.palette["background"])
-    _draw_filled_rect(c, 0, 0, 0.18 * inch, PAGE_H, plan.palette["accent"])
+    pal = _pdf_pal(plan, spec)
+    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, pal["background"])
+    _draw_filled_rect(c, 0, 0, 0.18 * inch, PAGE_H, pal["accent"])
     _draw_text(
         c,
         spec.title,
         0.7 * inch,
         PAGE_H - 1.0 * inch,
-        color=plan.palette["primary"],
+        color=pal["primary"],
         size=28,
         bold=True,
         max_width=PAGE_W - 1.4 * inch,
@@ -322,8 +340,8 @@ def _render_two_column(
         0.7 * inch,
         PAGE_H - 1.7 * inch,
         width=half,
-        color=plan.palette["text"],
-        accent=plan.palette["accent"],
+        color=pal["text"],
+        accent=pal["accent"],
     )
     if right_b:
         _draw_bullets(
@@ -332,8 +350,8 @@ def _render_two_column(
             0.7 * inch + half + 0.7 * inch,
             PAGE_H - 1.7 * inch,
             width=half,
-            color=plan.palette["text"],
-            accent=plan.palette["accent"],
+            color=pal["text"],
+            accent=pal["accent"],
         )
     elif image is not None:
         _draw_image(
@@ -349,14 +367,15 @@ def _render_two_column(
 def _render_conclusion(
     c: canvas.Canvas, plan: PresentationPlan, spec: SlideSpec
 ) -> None:
-    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, plan.palette["background"])
-    _draw_filled_rect(c, 0, PAGE_H - 0.25 * inch, PAGE_W, 0.25 * inch, plan.palette["accent"])
+    pal = _pdf_pal(plan, spec)
+    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, pal["background"])
+    _draw_filled_rect(c, 0, PAGE_H - 0.25 * inch, PAGE_W, 0.25 * inch, pal["accent"])
     _draw_text(
         c,
         spec.title or "Выводы",
         0.9 * inch,
         PAGE_H - 1.4 * inch,
-        color=plan.palette["primary"],
+        color=pal["primary"],
         size=34,
         bold=True,
         align="center",
@@ -369,8 +388,8 @@ def _render_conclusion(
             1.5 * inch,
             PAGE_H - 2.4 * inch,
             width=PAGE_W - 3.0 * inch,
-            color=plan.palette["text"],
-            accent=plan.palette["accent"],
+            color=pal["text"],
+            accent=pal["accent"],
             size=18,
         )
     elif spec.body:
@@ -379,7 +398,7 @@ def _render_conclusion(
             spec.body,
             1.5 * inch,
             PAGE_H - 2.4 * inch,
-            color=plan.palette["text"],
+            color=pal["text"],
             size=18,
             align="center",
             max_width=PAGE_W - 3.0 * inch,
@@ -390,11 +409,99 @@ def _render_conclusion(
             spec.subtitle,
             0.9 * inch,
             0.7 * inch,
-            color=plan.palette["muted"],
+            color=pal["muted"],
             size=15,
             align="center",
             max_width=PAGE_W - 1.8 * inch,
         )
+
+
+def _render_table(c: canvas.Canvas, plan: PresentationPlan, spec: SlideSpec) -> None:
+    pal = _pdf_pal(plan, spec)
+    _draw_filled_rect(c, 0, 0, PAGE_W, PAGE_H, pal["background"])
+    _draw_filled_rect(c, 0, 0, 0.18 * inch, PAGE_H, pal["accent"])
+    xl = 0.7 * inch
+
+    _draw_text(
+        c,
+        spec.title,
+        xl,
+        PAGE_H - 1.0 * inch,
+        color=pal["primary"],
+        size=28,
+        bold=True,
+        max_width=PAGE_W - 1.4 * inch,
+    )
+    _draw_filled_rect(c, xl, PAGE_H - 1.15 * inch, 1.2 * inch, 0.05 * inch, pal["accent"])
+    subtitle_y = PAGE_H - 1.55 * inch
+    table_top_gap = 2.2 * inch
+    if spec.subtitle:
+        _draw_text(
+            c,
+            spec.subtitle,
+            xl,
+            subtitle_y,
+            color=pal["muted"],
+            size=14,
+            max_width=PAGE_W - 1.4 * inch,
+        )
+        table_top_gap = 2.55 * inch
+
+    headers = list(spec.headers or [])
+    rows = [list(r) for r in (spec.rows or [])]
+    if not headers and rows:
+        n = max(len(r) for r in rows)
+        headers = [f"Колонка {i + 1}" for i in range(n)]
+        rows = [(r + [""] * n)[:n] for r in rows]
+    elif headers and rows:
+        n = len(headers)
+        rows = [(r + [""] * n)[:n] for r in rows]
+    else:
+        _draw_text(
+            c,
+            "Нет данных таблицы",
+            xl,
+            PAGE_H - table_top_gap,
+            color=pal["muted"],
+            size=14,
+            max_width=PAGE_W - 1.4 * inch,
+        )
+        return
+
+    data = [headers] + rows
+    table_w = PAGE_W - 1.4 * inch
+    ncols = len(headers)
+    col_widths = [table_w / ncols] * ncols
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    head_bg = HexColor(pal["accent"])
+    head_fg = HexColor("#FFFFFF")
+    surf = HexColor(pal.get("surface", "#FFFFFF"))
+    txt = HexColor(pal["text"])
+    border = HexColor(pal["muted"])
+    t.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), head_bg),
+                ("TEXTCOLOR", (0, 0), (-1, 0), head_fg),
+                ("FONTNAME", (0, 0), (-1, 0), _FONT_BOLD),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BACKGROUND", (0, 1), (-1, -1), surf),
+                ("TEXTCOLOR", (0, 1), (-1, -1), txt),
+                ("FONTNAME", (0, 1), (-1, -1), _FONT_REGULAR),
+                ("GRID", (0, 0), (-1, -1), 0.5, border),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
+    avail_h = PAGE_H - table_top_gap - 0.6 * inch
+    _w, th = t.wrapOn(c, table_w, avail_h)
+    th = min(th, avail_h)
+    bottom_y = PAGE_H - table_top_gap - th
+    t.drawOn(c, xl, bottom_y)
 
 
 def build_pdf(
@@ -414,6 +521,8 @@ def build_pdf(
             _render_two_column(c, plan, spec, img)
         elif spec.kind == "conclusion":
             _render_conclusion(c, plan, spec)
+        elif spec.kind == "table":
+            _render_table(c, plan, spec)
         else:
             _render_content(c, plan, spec, img)
         c.showPage()

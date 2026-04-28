@@ -42,13 +42,27 @@
           <input id="n_slides" type="number" min="3" max="20" value="10" />
         </label>
 
+        <label class="field full">
+          <span class="lbl">Стиль оформления (пресет)</span>
+          <select id="design_preset">
+            <option value="fresh">Свежее (slate / indigo)</option>
+            <option value="ocean">Океан (голубой)</option>
+            <option value="sunrise">Рассвет (оранж / розовый)</option>
+            <option value="midnight">Полночь (тёмный)</option>
+            <option value="pastel">Пастель (лаванда)</option>
+            <option value="forest">Лес (зелёный)</option>
+          </select>
+          <p class="hint">Цвета и декор экспорта подстроятся под пресет; палитру можно уточнить в редакторе.</p>
+        </label>
+
         <label class="field">
           <span class="lbl">Плотность текста</span>
           <div class="seg" data-name="text_density">
-            <button type="button" data-value="minimal">Минимум</button>
-            <button type="button" data-value="balanced" class="active">Краткий</button>
-            <button type="button" data-value="detailed">Подробно</button>
+            <button type="button" data-value="minimal" data-hint="≤3 буллета по 3–7 слов, без длинных текстов">Минимум</button>
+            <button type="button" data-value="balanced" class="active" data-hint="3–5 буллетов по 6–14 слов, короткий body допустим">Краткий</button>
+            <button type="button" data-value="detailed" data-hint="4–6 буллетов или абзац из 2–4 предложений">Подробно</button>
           </div>
+          <p class="hint" id="density-hint">3–5 буллетов по 6–14 слов, короткий body допустим</p>
         </label>
 
         <label class="field">

@@ -57,6 +57,7 @@
                 <option value="two_column">two_column</option>
                 <option value="section">section</option>
                 <option value="conclusion">conclusion</option>
+                <option value="table">table</option>
               </select>
             </label>
             <div class="active-slide-badge">
@@ -66,7 +67,47 @@
             <button id="add-bullet" type="button" class="btn btn-secondary">+ Пункт</button>
             <button id="change-image" type="button" class="btn btn-secondary">Заменить фото</button>
             <button id="clear-image" type="button" class="btn btn-secondary">Очистить фото</button>
+            <button id="engage-check" type="button" class="btn btn-secondary">Анти‑Душнила анализ</button>
+            <span class="table-tools" id="table-tools" style="display:none">
+              <button id="tbl-add-row" type="button" class="btn btn-secondary">+ строка</button>
+              <button id="tbl-del-row" type="button" class="btn btn-secondary">− строка</button>
+              <button id="tbl-add-col" type="button" class="btn btn-secondary">+ столбец</button>
+              <button id="tbl-del-col" type="button" class="btn btn-secondary">− столбец</button>
+            </span>
           </div>
+
+          <div id="design-toolbar" class="design-toolbar">
+            <p class="design-preset-note" id="design-preset-note"></p>
+            <div class="design-row">
+              <div>
+                <span class="lbl">Палитра презентации</span>
+                <div class="color-mini-grid" id="plan-palette-colors"></div>
+              </div>
+            </div>
+            <div class="design-row hide" id="image-placement-row">
+              <span class="lbl">Положение картинки</span>
+              <div class="placement-btns">
+                <button type="button" class="btn btn-secondary placement-btn active" id="img-place-right" data-value="right">Справа</button>
+                <button type="button" class="btn btn-secondary placement-btn" id="img-place-left" data-value="left">Слева</button>
+              </div>
+            </div>
+            <div class="design-row">
+              <div>
+                <span class="lbl">Цвета слайда (переопределение)</span>
+                <div class="color-mini-grid" id="slide-override-colors"></div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-compact" id="reset-slide-style">Сбросить стиль слайда</button>
+            </div>
+          </div>
+
+          <section class="engage-panel" id="engage-panel">
+            <div class="engage-top">
+              <strong>Audience Engagement Heatmap</strong>
+              <span class="engage-score" id="engage-score">Пока нет анализа.</span>
+            </div>
+            <p class="engage-summary hint" id="engage-summary">Запустите проверку, чтобы найти самые скучные слайды и получить улучшения.</p>
+            <div class="engage-list" id="engage-list"></div>
+          </section>
 
           <div class="slide-stage-wrap single-mode">
             <div id="slide-deck" class="slide-stage-single" aria-label="Активный слайд"></div>

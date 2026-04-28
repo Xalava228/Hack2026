@@ -145,6 +145,7 @@ async def run_pipeline(
     output_format: OutputFormat,
     image_backend: ImageBackend = "yandex-art",
     sample: SampleAnalysis | None = None,
+    design_preset: str = "fresh",
 ) -> JobResult:
     """Полный пайплайн. Обновляет статус джобы по ходу."""
     state = JOBS[job_id]
@@ -152,19 +153,24 @@ async def run_pipeline(
     client = AIClient()
 
     if sample is None:
-        state.update("planning", 0.05, "Спрашиваем у LLM структуру презентации…")
+        state.update(
+            "planning",
+            0.05,
+            "Шаг 1/2: LLM строит структуру презентации с учётом плотности текста…",
+        )
         plan = await plan_presentation(
             client,
             user_prompt=user_prompt,
             n_slides=n_slides,
             text_density=text_density,
             images_mode=images_mode,
+            design_preset=design_preset,
         )
     else:
         state.update(
             "planning",
             0.05,
-            f"Анализируем образец «{sample.file_name}» и адаптируем под вашу тему…",
+            f"Шаг 1/2: анализируем образец «{sample.file_name}» и адаптируем под тему…",
         )
         plan = await plan_presentation_from_sample(
             client,
@@ -173,6 +179,7 @@ async def run_pipeline(
             n_slides=n_slides,
             images_mode=images_mode,
             text_density=text_density,
+            design_preset=design_preset,
         )
     state.update("planned", 0.25, f"Готов план «{plan.title}» на {len(plan.slides)} слайдов.")
 

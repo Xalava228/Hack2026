@@ -15,6 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config
+from .engagement import analyze_plan_engagement
+from .ai_client import AIClient, AIClientError
 from .orchestrator import JOBS, create_job, run_job_async, run_render_job_async
 from .sample_analyzer import SampleAnalysis, analyze_file
 from .slide_planner import (
@@ -50,6 +52,10 @@ class GenerateRequest(BaseModel):
     output_format: str = Field("both", pattern="^(pptx|pdf|both)$")
     image_backend: str = Field("yandex-art", pattern="^(yandex-art|sd)$")
     sample_id: str | None = None
+    design_preset: str = Field(
+        "fresh",
+        pattern="^(fresh|ocean|sunrise|midnight|pastel|forest)$",
+    )
 
 
 class PlanRequest(GenerateRequest):
@@ -68,6 +74,10 @@ class RegenerateSlideRequest(BaseModel):
     slide_index: int = Field(..., ge=0, le=100)
     instruction: str = Field(..., min_length=3, max_length=1200)
     images_mode: str = Field("with-images", pattern="^(with-images|no-images)$")
+
+
+class EngagementRequest(BaseModel):
+    plan: dict
 
 
 _ALLOWED_SUFFIX = {".pptx", ".pdf"}
@@ -143,6 +153,7 @@ async def api_generate(req: GenerateRequest):
             output_format=req.output_format,  # type: ignore[arg-type]
             image_backend=req.image_backend,  # type: ignore[arg-type]
             sample=sample,
+            design_preset=req.design_preset,
         )
     )
     return {"job_id": job_id}
@@ -155,25 +166,36 @@ async def api_plan(req: PlanRequest):
         sample = SAMPLES.get(req.sample_id)
         if sample is None:
             raise HTTPException(status_code=404, detail="sample_id не найден")
-    from .ai_client import AIClient
-    client = AIClient()
-    if sample is None:
-        plan = await plan_presentation(
-            client,
-            user_prompt=req.prompt,
-            n_slides=req.n_slides,
-            text_density=req.text_density,  # type: ignore[arg-type]
-            images_mode=req.images_mode,  # type: ignore[arg-type]
+    try:
+        client = AIClient()
+        if sample is None:
+            plan = await plan_presentation(
+                client,
+                user_prompt=req.prompt,
+                n_slides=req.n_slides,
+                text_density=req.text_density,  # type: ignore[arg-type]
+                images_mode=req.images_mode,  # type: ignore[arg-type]
+                design_preset=req.design_preset,
+            )
+        else:
+            plan = await plan_presentation_from_sample(
+                client,
+                user_prompt=req.prompt,
+                sample=sample,
+                n_slides=req.n_slides,
+                images_mode=req.images_mode,  # type: ignore[arg-type]
+                text_density=req.text_density,  # type: ignore[arg-type]
+                design_preset=req.design_preset,
+            )
+    except AIClientError as e:
+        logger.warning("api_plan: AI unavailable: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="Сервис ИИ временно недоступен (проблема сети/доступа к AI API). Проверьте VPN/прокси/интернет и повторите.",
         )
-    else:
-        plan = await plan_presentation_from_sample(
-            client,
-            user_prompt=req.prompt,
-            sample=sample,
-            n_slides=req.n_slides,
-            images_mode=req.images_mode,  # type: ignore[arg-type]
-            text_density=req.text_density,  # type: ignore[arg-type]
-        )
+    except Exception:
+        logger.exception("api_plan failed unexpectedly")
+        raise HTTPException(status_code=500, detail="Не удалось собрать план презентации.")
     return {"plan": plan.to_dict()}
 
 
@@ -204,21 +226,35 @@ async def api_regenerate_slide(req: RegenerateSlideRequest):
         raise HTTPException(status_code=400, detail=f"invalid plan: {e}")
     if req.slide_index >= len(plan.slides):
         raise HTTPException(status_code=400, detail="slide_index out of range")
-    from .ai_client import AIClient
-    client = AIClient()
-    slide = await regenerate_slide(
-        client,
-        plan=plan,
-        slide_index=req.slide_index,
-        instruction=req.instruction,
-        images_mode=req.images_mode,  # type: ignore[arg-type]
-    )
+    try:
+        client = AIClient()
+        slide = await regenerate_slide(
+            client,
+            plan=plan,
+            slide_index=req.slide_index,
+            instruction=req.instruction,
+            images_mode=req.images_mode,  # type: ignore[arg-type]
+        )
+    except AIClientError:
+        raise HTTPException(
+            status_code=503,
+            detail="Сервис ИИ временно недоступен для перегенерации слайда.",
+        )
     old = req.plan.get("slides", [])
     if isinstance(old, list) and req.slide_index < len(old) and isinstance(old[req.slide_index], dict):
         old_data_url = str(old[req.slide_index].get("image_data_url", "")).strip()
         if old_data_url:
             slide.image_data_url = old_data_url
     return {"slide": slide.to_dict()}
+
+
+@app.post("/api/engagement-heatmap")
+async def api_engagement_heatmap(req: EngagementRequest):
+    try:
+        plan = plan_from_dict(req.plan)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"invalid plan: {e}")
+    return analyze_plan_engagement(plan)
 
 
 @app.get("/api/jobs/{job_id}")
