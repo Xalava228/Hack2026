@@ -18,11 +18,14 @@
 
 - **Name:** `slideforge-backend` (or your preferred name)
 - **Runtime:** `Python 3`
+- **Python Version:** `3.11.x` (important; do not use 3.14 for current pinned deps)
 - **Build Command:**
   - `pip install -r requirements.txt`
 - **Start Command:**
   - `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
 - **Plan:** Free/Starter (depending on your needs)
+
+Repository also includes `runtime.txt` with `python-3.11.11`.
 
 ## 4) Environment variables
 
@@ -35,6 +38,7 @@ Set these in Render -> **Environment**:
 Optional:
 
 - `PYTHONUNBUFFERED=1`
+- `PYTHON_VERSION=3.11.11` (recommended to force stable build environment)
 
 ## 5) Persistent data (optional)
 
@@ -58,6 +62,9 @@ If these return OK, service is running.
 - **503 AI unavailable:** invalid token, blocked outbound network, or wrong `AI_BASE_URL`.
 - **500 on planning:** check Render logs for exceptions from `backend.main`.
 - **Missing static pages:** make sure frontend files are present in `frontend/` and build is from correct branch.
+- **Build fails on `pydantic-core` / Rust / maturin:**
+  - reason: Render built on Python 3.14 and tried compiling from source;
+  - fix: set `PYTHON_VERSION=3.11.11` and redeploy with **Clear build cache & deploy**.
 
 ## 8) Auto deploy
 
