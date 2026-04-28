@@ -46,6 +46,7 @@ class SlideSpec:
     body: str = ""
     image_prompt: str = ""
     image_data_url: str = ""
+    background_image_data_url: str = ""
     notes: str = ""
     headers: list[str] = field(default_factory=list)
     rows: list[list[str]] = field(default_factory=list)
@@ -61,6 +62,7 @@ class SlideSpec:
             "body": self.body,
             "image_prompt": self.image_prompt,
             "image_data_url": self.image_data_url,
+            "background_image_data_url": self.background_image_data_url,
             "notes": self.notes,
             "headers": list(self.headers),
             "rows": [list(r) for r in self.rows],
@@ -511,6 +513,7 @@ def _coerce_slide(d: dict[str, Any], idx: int, total: int) -> SlideSpec:
         body=body,
         image_prompt=str(d.get("image_prompt", "")).strip(),
         image_data_url=str(d.get("image_data_url", "")).strip(),
+        background_image_data_url=str(d.get("background_image_data_url", "")).strip(),
         notes=str(d.get("notes", "")).strip(),
         headers=headers,
         rows=rows,
@@ -576,7 +579,7 @@ async def _self_check_plan(
 5) ЗАГОЛОВКИ — короткие (до 60 символов), без точки в конце.
 6) СТРУКТУРА — сохрани тот же набор и порядок kind у слайдов и общее их количество.
 7) ЯЗЫК — {language}.
-8) Поля image_prompt и image_data_url НЕ меняй (оставь как есть).
+8) Поля image_prompt, image_data_url и background_image_data_url НЕ меняй (оставь как есть).
 9) РЕЖИМ ПЛОТНОСТИ обязателен:
    - minimal: до 3 буллетов, body пустой;
    - balanced: 3–5 буллетов, body максимум 1 короткое предложение;
@@ -632,6 +635,9 @@ async def _self_check_plan(
             url = str(src_slides[i].get("image_data_url", "")).strip()
             if url:
                 s["image_data_url"] = url
+            bg_url = str(src_slides[i].get("background_image_data_url", "")).strip()
+            if bg_url:
+                s["background_image_data_url"] = bg_url
             if not s.get("image_prompt"):
                 s["image_prompt"] = src_slides[i].get("image_prompt", "")
 
@@ -991,6 +997,7 @@ async def regenerate_slide(
         slide.title = current.title
     slide.kind = current.kind
     slide.image_data_url = current.image_data_url
+    slide.background_image_data_url = current.background_image_data_url
     slide.style = {**dict(current.style), **dict(slide.style)}
     slide.image_placement = current.image_placement
     if current.kind == "table" and not (slide.headers and slide.rows):

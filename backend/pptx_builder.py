@@ -5,7 +5,9 @@
 """
 from __future__ import annotations
 
+import base64
 import io
+import re
 from pathlib import Path
 
 from PIL import Image as PILImage
@@ -20,6 +22,7 @@ from .slide_planner import PresentationPlan, SlideSpec
 
 SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
+_DATA_URL_RE = re.compile(r"^data:image/[a-zA-Z0-9.+-]+;base64,(.+)$")
 
 
 def _slide_palette(plan: PresentationPlan, spec: SlideSpec) -> dict[str, str]:
@@ -82,6 +85,25 @@ def _add_background(slide, color: str) -> None:
     rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, SLIDE_W, SLIDE_H)
     _set_solid_fill(rect, color)
     rect.shadow.inherit = False
+
+
+def _decode_data_url_image(value: str) -> bytes | None:
+    if not value:
+        return None
+    m = _DATA_URL_RE.match(value.strip())
+    if not m:
+        return None
+    try:
+        return base64.b64decode(m.group(1), validate=True)
+    except Exception:
+        return None
+
+
+def _add_slide_background_image(slide, spec: SlideSpec) -> None:
+    bg = _decode_data_url_image(getattr(spec, "background_image_data_url", "") or "")
+    if not bg:
+        return
+    _add_image(slide, bg, 0, 0, SLIDE_W, SLIDE_H)
 
 
 def _add_accent_bar(slide, color: str, x=0, y=0, w=Inches(0.18), h=SLIDE_H) -> None:
@@ -291,6 +313,7 @@ def _render_title(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) ->
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
     _add_background(slide, pal["background"])
+    _add_slide_background_image(slide, spec)
     _decorate_modern_title(slide, pal, pid)
     _add_accent_bar(slide, pal["accent"], 0, 0, SLIDE_W, Inches(0.22))
     _add_accent_bar(
@@ -335,6 +358,7 @@ def _render_section(prs: Presentation, plan: PresentationPlan, spec: SlideSpec) 
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
     _add_background(slide, pal["primary"])
+    _add_slide_background_image(slide, spec)
     _add_textbox(
         slide,
         Inches(1.0),
@@ -381,6 +405,7 @@ def _render_content(
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
     _add_background(slide, pal["background"])
+    _add_slide_background_image(slide, spec)
     _decorate_content_header(slide, pal, pid)
     wbar = _accent_bar_width(pid)
     _add_accent_bar(slide, pal["accent"], 0, 0, wbar, SLIDE_H)
@@ -535,6 +560,7 @@ def _render_two_column(
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
     _add_background(slide, pal["background"])
+    _add_slide_background_image(slide, spec)
     _decorate_content_header(slide, pal, pid)
     wbar = _accent_bar_width(pid)
     _add_accent_bar(slide, pal["accent"], 0, 0, wbar, SLIDE_H)
@@ -628,6 +654,7 @@ def _render_table_slide(prs: Presentation, plan: PresentationPlan, spec: SlideSp
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
     _add_background(slide, pal["background"])
+    _add_slide_background_image(slide, spec)
     _decorate_content_header(slide, pal, pid)
     wbar = _accent_bar_width(pid)
     _add_accent_bar(slide, pal["accent"], 0, 0, wbar, SLIDE_H)
@@ -698,6 +725,7 @@ def _render_conclusion(
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
     _add_background(slide, pal["background"])
+    _add_slide_background_image(slide, spec)
     _add_accent_bar(slide, pal["accent"], 0, 0, SLIDE_W, Inches(0.22))
     a2 = pal.get("accent2", pal["accent"])
     spot = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(11.0), Inches(0.45), Inches(1.6), Inches(1.6))

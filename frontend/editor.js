@@ -34,6 +34,9 @@
   const changeImageBtn = document.getElementById('change-image');
   const clearImageBtn = document.getElementById('clear-image');
   const imageFileEl = document.getElementById('image-file');
+  const changeBgImageBtn = document.getElementById('change-bg-image');
+  const clearBgImageBtn = document.getElementById('clear-bg-image');
+  const bgImageFileEl = document.getElementById('bg-image-file');
   const tableToolsEl = document.getElementById('table-tools');
   const tblAddRowBtn = document.getElementById('tbl-add-row');
   const tblDelRowBtn = document.getElementById('tbl-del-row');
@@ -191,6 +194,7 @@
       body: String(slide?.body || ''),
       image_prompt: String(slide?.image_prompt || ''),
       image_data_url: String(slide?.image_data_url || ''),
+      background_image_data_url: String(slide?.background_image_data_url || ''),
       notes: String(slide?.notes || ''),
       headers: rawHeaders,
       rows,
@@ -297,6 +301,8 @@
     const showImage = !isTable && k !== 'title' && k !== 'section' && k !== 'conclusion';
     if (changeImageBtn) changeImageBtn.style.display = showImage ? '' : 'none';
     if (clearImageBtn) clearImageBtn.style.display = showImage ? '' : 'none';
+    if (changeBgImageBtn) changeBgImageBtn.style.display = !isTable ? '' : 'none';
+    if (clearBgImageBtn) clearBgImageBtn.style.display = !isTable ? '' : 'none';
   }
 
   function makeEditable(tag, className, value, onInput, placeholder) {
@@ -446,6 +452,11 @@
     canvas.classList.add(`preset-${pid}`);
     canvas.classList.add(`layout-${layout}`);
     applyPalette(canvas, slide);
+    if (slide.background_image_data_url) {
+      canvas.style.backgroundImage = `url("${slide.background_image_data_url}")`;
+      canvas.style.backgroundSize = 'cover';
+      canvas.style.backgroundPosition = 'center';
+    }
 
     if (slide.kind === 'title') {
       const barTop = document.createElement('div');
@@ -803,6 +814,19 @@
     render();
   });
 
+  changeBgImageBtn?.addEventListener('click', () => {
+    if (!ensureState()) return;
+    bgImageFileEl?.click();
+  });
+
+  clearBgImageBtn?.addEventListener('click', () => {
+    if (!ensureState()) return;
+    currentSlide().background_image_data_url = '';
+    if (bgImageFileEl) bgImageFileEl.value = '';
+    persist();
+    render();
+  });
+
   imageFileEl.addEventListener('change', (e) => {
     if (!ensureState()) return;
     const file = e.target.files?.[0];
@@ -815,6 +839,24 @@
     const reader = new FileReader();
     reader.onload = () => {
       currentSlide().image_data_url = String(reader.result || '');
+      persist();
+      render();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  bgImageFileEl?.addEventListener('change', (e) => {
+    if (!ensureState()) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 6 * 1024 * 1024) {
+      alert('Фон слишком большой. Максимум 6 МБ.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      currentSlide().background_image_data_url = String(reader.result || '');
       persist();
       render();
     };
@@ -901,8 +943,10 @@
         }),
       });
       const oldImage = currentSlide().image_data_url;
+      const oldBgImage = currentSlide().background_image_data_url;
       const next = normalizeSlide(resp.slide || {}, state.selectedIndex);
       if (oldImage && !next.image_data_url) next.image_data_url = oldImage;
+      if (oldBgImage && !next.background_image_data_url) next.background_image_data_url = oldBgImage;
       state.plan.slides[state.selectedIndex] = next;
       persist();
       render();

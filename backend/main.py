@@ -296,6 +296,9 @@ async def api_regenerate_slide(req: RegenerateSlideRequest):
         old_data_url = str(old[req.slide_index].get("image_data_url", "")).strip()
         if old_data_url:
             slide.image_data_url = old_data_url
+        old_bg_url = str(old[req.slide_index].get("background_image_data_url", "")).strip()
+        if old_bg_url:
+            slide.background_image_data_url = old_bg_url
     return {"slide": slide.to_dict()}
 
 
