@@ -146,12 +146,12 @@
   };
 
   const PRESET_STYLE_TOKENS = {
-    fresh: { titleFont: '"Calibri", "Segoe UI", sans-serif', bodyFont: '"Calibri", "Segoe UI", sans-serif', underlineRatio: 0.09 },
-    ocean: { titleFont: '"Segoe UI", "Trebuchet MS", sans-serif', bodyFont: '"Segoe UI", "Arial", sans-serif', underlineRatio: 0.12 },
-    sunrise: { titleFont: '"Trebuchet MS", "Verdana", sans-serif', bodyFont: '"Verdana", "Arial", sans-serif', underlineRatio: 0.1 },
-    midnight: { titleFont: '"Bahnschrift", "Segoe UI", sans-serif', bodyFont: '"Bahnschrift", "Segoe UI", sans-serif', underlineRatio: 0.14 },
-    pastel: { titleFont: '"Candara", "Segoe UI", sans-serif', bodyFont: '"Candara", "Segoe UI", sans-serif', underlineRatio: 0.11 },
-    forest: { titleFont: '"Cambria", "Times New Roman", serif', bodyFont: '"Cambria", "Georgia", serif', underlineRatio: 0.08 },
+    fresh: { titleFont: '"Calibri", "Segoe UI", sans-serif', bodyFont: '"Calibri", "Segoe UI", sans-serif', underlineRatio: 0.09, layout: 'clean' },
+    ocean: { titleFont: '"Segoe UI", "Trebuchet MS", sans-serif', bodyFont: '"Segoe UI", "Arial", sans-serif', underlineRatio: 0.12, layout: 'split' },
+    sunrise: { titleFont: '"Trebuchet MS", "Verdana", sans-serif', bodyFont: '"Verdana", "Arial", sans-serif', underlineRatio: 0.1, layout: 'cards' },
+    midnight: { titleFont: '"Bahnschrift", "Segoe UI", sans-serif', bodyFont: '"Bahnschrift", "Segoe UI", sans-serif', underlineRatio: 0.14, layout: 'bold' },
+    pastel: { titleFont: '"Candara", "Segoe UI", sans-serif', bodyFont: '"Candara", "Segoe UI", sans-serif', underlineRatio: 0.11, layout: 'cards' },
+    forest: { titleFont: '"Cambria", "Times New Roman", serif', bodyFont: '"Cambria", "Georgia", serif', underlineRatio: 0.08, layout: 'clean' },
   };
 
   function styleForPreset(presetId) {

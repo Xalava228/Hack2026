@@ -87,6 +87,7 @@ PRESET_STYLE_TOKENS: dict[str, dict[str, str | float]] = {
         "title_scale": 1.0,
         "body_scale": 1.0,
         "underline_ratio": 0.09,
+        "layout": "clean",
     },
     "ocean": {
         "title_font": "Segoe UI Semibold",
@@ -94,6 +95,7 @@ PRESET_STYLE_TOKENS: dict[str, dict[str, str | float]] = {
         "title_scale": 1.02,
         "body_scale": 1.0,
         "underline_ratio": 0.12,
+        "layout": "split",
     },
     "sunrise": {
         "title_font": "Trebuchet MS",
@@ -101,6 +103,7 @@ PRESET_STYLE_TOKENS: dict[str, dict[str, str | float]] = {
         "title_scale": 1.04,
         "body_scale": 0.98,
         "underline_ratio": 0.1,
+        "layout": "cards",
     },
     "midnight": {
         "title_font": "Bahnschrift SemiBold",
@@ -108,6 +111,7 @@ PRESET_STYLE_TOKENS: dict[str, dict[str, str | float]] = {
         "title_scale": 1.03,
         "body_scale": 1.02,
         "underline_ratio": 0.14,
+        "layout": "bold",
     },
     "pastel": {
         "title_font": "Candara Bold",
@@ -115,6 +119,7 @@ PRESET_STYLE_TOKENS: dict[str, dict[str, str | float]] = {
         "title_scale": 1.02,
         "body_scale": 1.0,
         "underline_ratio": 0.11,
+        "layout": "cards",
     },
     "forest": {
         "title_font": "Cambria Bold",
@@ -122,6 +127,7 @@ PRESET_STYLE_TOKENS: dict[str, dict[str, str | float]] = {
         "title_scale": 1.0,
         "body_scale": 1.0,
         "underline_ratio": 0.08,
+        "layout": "clean",
     },
 }
 

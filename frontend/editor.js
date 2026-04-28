@@ -214,6 +214,9 @@
         if (!state.plan.palette[k]) state.plan.palette[k] = D[k];
       });
     }
+    if (!state.plan.design_preset && state?.payload?.design_preset) {
+      state.plan.design_preset = String(state.payload.design_preset);
+    }
     if (!state.plan.design_preset) state.plan.design_preset = 'fresh';
     if (state.engagement && Array.isArray(state.engagement.slides)) {
       if (state.engagement.slides.length !== state.plan.slides.length) state.engagement = null;
@@ -395,6 +398,7 @@
       '--p-font-title': presetStyle.titleFont,
       '--p-font-body': presetStyle.bodyFont,
       '--p-underline-ratio': String(presetStyle.underlineRatio || 0.09),
+      '--p-layout': presetStyle.layout || 'clean',
     };
     Object.entries(map).forEach(([k, v]) => canvas.style.setProperty(k, v));
   }
@@ -436,6 +440,11 @@
 
     const canvas = document.createElement('div');
     canvas.className = `slide-canvas kind-${slide.kind}`;
+    const pid = state.plan.design_preset || 'fresh';
+    const presetStyle = window.SF.styleForPreset(pid);
+    const layout = presetStyle.layout || 'clean';
+    canvas.classList.add(`preset-${pid}`);
+    canvas.classList.add(`layout-${layout}`);
     applyPalette(canvas, slide);
 
     if (slide.kind === 'title') {
@@ -471,7 +480,7 @@
       barTop.className = 'cap-bar cap-top';
 
       const concl = document.createElement('div');
-      concl.className = 'concl-frame';
+      concl.className = `concl-frame layout-${layout}`;
       concl.appendChild(makeEditable('h1', 'concl-title', slide.title, (v) => { slide.title = v; }, 'Заголовок'));
 
       if (slide.bullets && slide.bullets.length) {
@@ -570,7 +579,7 @@
       const rightB = bullets.length ? bullets.slice(splitAt) : [];
 
       const cols = document.createElement('div');
-      cols.className = 'two-cols';
+      cols.className = `two-cols two-cols-${layout}`;
 
       const colL = document.createElement('div');
       colL.className = 'two-col';
@@ -615,7 +624,7 @@
     const hasImage = !!(slide.image_data_url || slide.image_prompt);
     const imageLeft =
       slide.kind === 'content' && hasImage && (slide.image_placement || 'right') === 'left';
-    body.className = `content-body-row${hasImage ? ' with-image' : ''}${imageLeft ? ' image-left' : ''}`;
+    body.className = `content-body-row layout-${layout}${hasImage ? ' with-image' : ''}${imageLeft ? ' image-left' : ''}`;
 
     const text = document.createElement('div');
     text.className = 'content-text';

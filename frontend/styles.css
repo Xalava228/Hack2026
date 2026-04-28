@@ -913,6 +913,107 @@ textarea:focus {
   flex-direction: column;
 }
 
+.slide-canvas.layout-cards .content-text,
+.slide-canvas.layout-cards .two-col,
+.slide-canvas.layout-cards .concl-frame.layout-cards {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(139, 92, 246, 0.28);
+  border-radius: 16px;
+  box-shadow: 0 14px 28px rgba(98, 65, 177, 0.14);
+  padding: 2.2% 2.6%;
+}
+
+.slide-canvas.layout-cards .content-head {
+  margin-bottom: 2.8%;
+}
+
+.slide-canvas.layout-cards .content-body-row.with-image .slide-image-pane,
+.slide-canvas.layout-cards .content-body-row.with-image.image-left .slide-image-pane {
+  border-radius: 14px;
+  border: 2px solid rgba(139, 92, 246, 0.24);
+  box-shadow: 0 10px 20px rgba(98, 65, 177, 0.12);
+}
+
+.slide-canvas.layout-split .content-frame,
+.slide-canvas.layout-split .two-frame {
+  padding-left: 4.2%;
+  padding-right: 4.2%;
+}
+
+.slide-canvas .two-cols-split {
+  position: relative;
+}
+
+.slide-canvas .two-cols-split::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 1%;
+  bottom: 1%;
+  width: 2px;
+  transform: translateX(-1px);
+  background: linear-gradient(to bottom, transparent, var(--p-accent), transparent);
+}
+
+.slide-canvas .two-cols-split .two-col {
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  border-radius: 14px;
+  padding: 2% 2.2%;
+}
+
+.slide-canvas.layout-bold {
+  background: linear-gradient(140deg, #0b1220 0%, #1a2438 58%, #111827 100%);
+  --p-text: #F8FAFC;
+  --p-muted: #E2E8F0;
+  --p-primary: #F8FAFC;
+  --p-bg: #F8FAFC;
+}
+
+.slide-canvas.layout-bold .left-accent {
+  width: 2.2%;
+}
+
+.slide-canvas.layout-bold .content-text,
+.slide-canvas.layout-bold .two-col,
+.slide-canvas.layout-bold .concl-frame.layout-bold {
+  background: rgba(6, 10, 20, 0.68);
+  border: 1px solid rgba(129, 140, 248, 0.62);
+  border-radius: 14px;
+  padding: 2.1% 2.4%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 10px 22px rgba(0, 0, 0, 0.28);
+}
+
+.slide-canvas.layout-bold .content-title {
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.slide-canvas.layout-bold .content-subtitle,
+.slide-canvas.layout-bold .content-body,
+.slide-canvas.layout-bold .canvas-bullet-text,
+.slide-canvas.layout-bold .concl-body,
+.slide-canvas.layout-bold .concl-foot,
+.slide-canvas.layout-bold .content-title,
+.slide-canvas.layout-bold .concl-title {
+  color: var(--p-bg);
+}
+
+.slide-canvas.layout-bold .canvas-bullet-dot {
+  color: var(--p-bg);
+}
+
+.slide-canvas.layout-bold .editable,
+.slide-canvas.layout-bold .table-cell,
+.slide-canvas.layout-bold .table-cell-h {
+  color: var(--p-bg) !important;
+}
+
+.slide-canvas.layout-bold .canvas-mini-delete {
+  color: #F8FAFC;
+}
+
 .content-subtitle {
   margin: 0 0 1.4% 0;
   color: var(--p-muted);

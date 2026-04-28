@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+import json
 import logging
 from pathlib import Path
+import time
 
 import shutil
 import uuid
@@ -29,6 +32,22 @@ from .slide_planner import (
 from .web_research import collect_web_context
 
 SAMPLES: dict[str, SampleAnalysis] = {}
+PLAN_CACHE: dict[str, tuple[float, dict]] = {}
+PLAN_CACHE_TTL_SEC = 60 * 20
+
+
+def _plan_cache_key(req: PlanRequest) -> str:
+    payload = {
+        "prompt": req.prompt.strip(),
+        "n_slides": req.n_slides,
+        "text_density": req.text_density,
+        "images_mode": req.images_mode,
+        "research_mode": req.research_mode,
+        "sample_id": req.sample_id or "",
+        "design_preset": req.design_preset,
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -171,6 +190,12 @@ async def api_generate(req: GenerateRequest):
 
 @app.post("/api/plan")
 async def api_plan(req: PlanRequest):
+    now = time.monotonic()
+    cache_key = _plan_cache_key(req)
+    cached = PLAN_CACHE.get(cache_key)
+    if cached and (now - cached[0]) <= PLAN_CACHE_TTL_SEC:
+        return {"plan": cached[1]}
+
     sample = None
     if req.sample_id:
         sample = SAMPLES.get(req.sample_id)
@@ -215,7 +240,14 @@ async def api_plan(req: PlanRequest):
     except Exception:
         logger.exception("api_plan failed unexpectedly")
         raise HTTPException(status_code=500, detail="Не удалось собрать план презентации.")
-    return {"plan": plan.to_dict()}
+    plan_dict = plan.to_dict()
+    PLAN_CACHE[cache_key] = (now, plan_dict)
+    if len(PLAN_CACHE) > 120:
+        stale_cutoff = now - PLAN_CACHE_TTL_SEC
+        for k, (ts, _) in list(PLAN_CACHE.items()):
+            if ts < stale_cutoff:
+                PLAN_CACHE.pop(k, None)
+    return {"plan": plan_dict}
 
 
 @app.post("/api/render")
@@ -278,8 +310,12 @@ async def api_engagement_heatmap(req: EngagementRequest):
 
 @app.post("/api/web-images")
 async def api_web_images(req: WebImagesRequest):
-    client = AIClient()
-    images = await client.internet_image_candidates(req.query, count=req.count, aspect=req.aspect)
+    try:
+        client = AIClient()
+        images = await client.internet_image_candidates(req.query, count=req.count, aspect=req.aspect)
+    except Exception:
+        logger.exception("web image search failed")
+        raise HTTPException(status_code=503, detail="Не удалось выполнить поиск картинок по запросу.")
     encoded = [
         f"data:image/jpeg;base64,{base64.b64encode(img).decode('ascii')}"
         for img in images

@@ -89,6 +89,18 @@ def _add_accent_bar(slide, color: str, x=0, y=0, w=Inches(0.18), h=SLIDE_H) -> N
     _set_solid_fill(bar, color)
 
 
+def _add_soft_panel(slide, left, top, width, height, *, fill: str, border: str | None = None) -> None:
+    panel = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
+    panel.fill.solid()
+    panel.fill.fore_color.rgb = _hex(fill)
+    if border:
+        panel.line.color.rgb = _hex(border)
+        panel.line.width = Pt(1.1)
+    else:
+        panel.line.fill.background()
+    panel.shadow.inherit = False
+
+
 def _add_textbox(
     slide,
     left,
@@ -352,6 +364,7 @@ def _render_content(
     title_scale = float(style.get("title_scale", 1.0))
     body_scale = float(style.get("body_scale", 1.0))
     underline_ratio = float(style.get("underline_ratio", 0.09))
+    layout = str(style.get("layout", "clean"))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -408,6 +421,30 @@ def _render_content(
             img_w = SLIDE_W - img_left - Inches(0.5)
             img_h = SLIDE_H - img_top - Inches(0.5)
 
+    if layout in ("cards", "bold"):
+        card_fill = pal["surface"] if layout == "cards" else pal["primary"]
+        card_border = pal["accent2"] if layout == "cards" else pal["accent"]
+        _add_soft_panel(
+            slide,
+            text_left - Inches(0.14),
+            text_top - Inches(0.1),
+            text_width + Inches(0.2),
+            text_height + Inches(0.12),
+            fill=card_fill,
+            border=card_border,
+        )
+        if has_image:
+            _add_soft_panel(
+                slide,
+                img_left - Inches(0.08),
+                img_top - Inches(0.08),
+                img_w + Inches(0.16),
+                img_h + Inches(0.16),
+                fill=pal["surface"],
+                border=pal["accent2"],
+            )
+
+    text_color = pal["text"] if layout != "bold" else pal["background"]
     if spec.bullets:
         _add_bullets(
             slide,
@@ -416,7 +453,7 @@ def _render_content(
             text_width,
             text_height,
             spec.bullets,
-            color=pal["text"],
+            color=text_color,
             accent=pal["accent"],
             size=max(14, int(20 * body_scale)),
             font_name=body_font,
@@ -429,7 +466,7 @@ def _render_content(
             text_width,
             text_height,
             spec.body,
-            color=pal["text"],
+            color=text_color,
             size=max(13, int(18 * body_scale)),
             font_name=body_font,
         )
@@ -450,6 +487,7 @@ def _render_two_column(
     body_font = str(style.get("body_font", "Calibri"))
     title_scale = float(style.get("title_scale", 1.0))
     body_scale = float(style.get("body_scale", 1.0))
+    layout = str(style.get("layout", "clean"))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -475,13 +513,36 @@ def _render_two_column(
     bullets = spec.bullets or []
     left_b = bullets[: max(1, len(bullets) // 2)] or bullets
     right_b = bullets[len(left_b) :]
+    col_h = SLIDE_H - Inches(2.2)
+    left_x = Inches(0.7)
+    right_x = Inches(0.7) + half + Inches(0.7)
+
+    if layout in ("cards", "split"):
+        _add_soft_panel(
+            slide,
+            left_x - Inches(0.08),
+            Inches(1.62),
+            half + Inches(0.16),
+            col_h + Inches(0.12),
+            fill=pal["surface"],
+            border=pal["accent2"],
+        )
+        _add_soft_panel(
+            slide,
+            right_x - Inches(0.08),
+            Inches(1.62),
+            half + Inches(0.16),
+            col_h + Inches(0.12),
+            fill=pal["surface"],
+            border=pal["accent2"],
+        )
 
     _add_bullets(
         slide,
-        Inches(0.7),
+        left_x,
         Inches(1.7),
         half,
-        SLIDE_H - Inches(2.2),
+        col_h,
         left_b,
         color=pal["text"],
         accent=pal["accent"],
@@ -491,10 +552,10 @@ def _render_two_column(
     if right_b:
         _add_bullets(
             slide,
-            Inches(0.7) + half + Inches(0.7),
+            right_x,
             Inches(1.7),
             half,
-            SLIDE_H - Inches(2.2),
+            col_h,
             right_b,
             color=pal["text"],
             accent=pal["accent"],
@@ -505,10 +566,10 @@ def _render_two_column(
         _add_image(
             slide,
             image,
-            Inches(0.7) + half + Inches(0.7),
+            right_x,
             Inches(1.7),
             half,
-            SLIDE_H - Inches(2.2),
+            col_h,
         )
 
 
@@ -589,6 +650,7 @@ def _render_conclusion(
     body_font = str(style.get("body_font", "Calibri"))
     title_scale = float(style.get("title_scale", 1.0))
     body_scale = float(style.get("body_scale", 1.0))
+    layout = str(style.get("layout", "clean"))
     pal = _slide_palette(plan, spec)
     blank = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank)
@@ -599,6 +661,21 @@ def _render_conclusion(
     spot.fill.solid()
     spot.fill.fore_color.rgb = _hex(a2)
     spot.line.fill.background()
+
+    if layout in ("cards", "bold"):
+        panel_fill = pal["surface"] if layout == "cards" else pal["primary"]
+        panel_border = pal["accent2"] if layout == "cards" else pal["accent"]
+        _add_soft_panel(
+            slide,
+            Inches(0.95),
+            Inches(2.25),
+            SLIDE_W - Inches(1.9),
+            Inches(4.35),
+            fill=panel_fill,
+            border=panel_border,
+        )
+
+    concl_text = pal["text"] if layout != "bold" else pal["background"]
 
     _add_textbox(
         slide,
@@ -622,7 +699,7 @@ def _render_conclusion(
             SLIDE_W - Inches(3.0),
             Inches(4.0),
             spec.bullets,
-            color=pal["text"],
+            color=concl_text,
             accent=pal["accent"],
             size=max(16, int(22 * body_scale)),
             font_name=body_font,
@@ -635,7 +712,7 @@ def _render_conclusion(
             SLIDE_W - Inches(3.0),
             Inches(4.0),
             spec.body,
-            color=pal["text"],
+            color=concl_text,
             size=max(16, int(22 * body_scale)),
             align="center",
             font_name=body_font,

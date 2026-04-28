@@ -100,6 +100,7 @@ class JobState:
 
 
 JOBS: dict[str, JobState] = {}
+IMAGE_CACHE: dict[tuple[str, str, str], bytes] = {}
 
 
 def _safe_filename(s: str) -> str:
@@ -130,11 +131,22 @@ async def _generate_one_image(
     aspect: str,
     timeout_sec: float,
 ) -> tuple[int, bytes | None]:
+    key = (str(backend), str(aspect), prompt.strip())
+    cached = IMAGE_CACHE.get(key)
+    if cached is not None:
+        return idx, cached
+
     try:
         data = await asyncio.wait_for(
             client.generate_image(prompt, backend=backend, aspect=aspect),
             timeout=timeout_sec,
         )
+        if data:
+            IMAGE_CACHE[key] = data
+            if len(IMAGE_CACHE) > 180:
+                # Простая защита от бесконечного роста in-memory кэша.
+                for old_key in list(IMAGE_CACHE.keys())[:40]:
+                    IMAGE_CACHE.pop(old_key, None)
         return idx, data
     except TimeoutError:
         logger.warning(

@@ -179,11 +179,11 @@ _DENSITY_RULES: dict[str, dict[str, Any]] = {
     "detailed": {
         "label": "подробный",
         "rule": (
-            "4–6 буллетов на слайде ИЛИ связный body из 2–4 предложений; "
-            "буллеты до 16 слов; раскрывай суть конкретными формулировками, без воды"
+            "5–8 буллетов на слайде И/ИЛИ связный body из 3–6 предложений; "
+            "буллеты до 20 слов; раскрывай суть конкретными формулировками, с примерами и следствиями"
         ),
-        "max_bullets": 6,
-        "max_bullet_words": 16,
+        "max_bullets": 8,
+        "max_bullet_words": 20,
         "allow_body": True,
     },
 }
@@ -275,12 +275,15 @@ def _build_prompt(
    На table-слайде поля bullets/body оставляй пустыми. image_prompt оставляй пустым (картинки нет).
 5. Поле palette можно заполнить примерными hex — точные цвета потом задаёт системный пресет «{preset_label or "пресет"}»; придерживайся тона этого стиля в формулировках.
 6. Заголовки слайдов — короткие (до 60 символов), без точек в конце.
-7. ФАКТЫ. Если ты не уверен в конкретной цифре, дате, имени или названии — НЕ пиши его.
+7. Формат текста: не используй символы маркеров «•», «-», «*» внутри body/subtitle/title.
+   Если нужен body — пиши связными предложениями (обычный абзац), а не псевдо-списком.
+   Body не должен повторять буллеты теми же формулировками: добавляй новое пояснение, пример или вывод.
+8. ФАКТЫ. Если ты не уверен в конкретной цифре, дате, имени или названии — НЕ пиши его.
    Лучше дать обобщённую формулировку, чем выдумать факт. Никаких «галлюцинаций».
    Особенно в таблицах: пустая ячейка лучше выдуманного числа.
-8. Не повторяйся между слайдами и не противоречь сам себе (одни и те же утверждения с разными цифрами — недопустимо).
-9. Соблюдай ограничение по плотности из пункта выше — это жёсткое правило (на table-слайды плотность не влияет).
-10. Верни ТОЛЬКО валидный JSON следующей формы:
+9. Не повторяйся между слайдами и не противоречь сам себе (одни и те же утверждения с разными цифрами — недопустимо).
+10. Соблюдай ограничение по плотности из пункта выше — это жёсткое правило (на table-слайды плотность не влияет).
+11. Верни ТОЛЬКО валидный JSON следующей формы:
 
 {json.dumps(schema, ensure_ascii=False, indent=2)}
 
@@ -307,15 +310,173 @@ def _extract_json(raw: str) -> dict[str, Any]:
     return json.loads(candidate)
 
 
+def _clean_text_artifacts(text: str) -> str:
+    s = str(text or "").replace("\u2022", " ").replace("•", " ")
+    s = re.sub(r"[ \t]+", " ", s)
+    s = re.sub(r"\s+\n", "\n", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip(" \n\t-")
+
+
+def _body_from_bulletish_text(text: str) -> str:
+    raw = str(text or "")
+    parts = [p.strip(" \t-•") for p in re.split(r"[•\n]+", raw) if p.strip(" \t-•")]
+    if not parts:
+        return _clean_text_artifacts(raw)
+    sentence_parts: list[str] = []
+    for p in parts:
+        q = _clean_text_artifacts(p)
+        if not q:
+            continue
+        if q[-1] not in ".!?":
+            q += "."
+        sentence_parts.append(q)
+    return " ".join(sentence_parts).strip()
+
+
+def _split_sentences(text: str) -> list[str]:
+    raw = _clean_text_artifacts(text)
+    if not raw:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", raw)
+    out = [_clean_text_artifacts(p) for p in parts if _clean_text_artifacts(p)]
+    return out
+
+
+def _clip_words(text: str, max_words: int) -> str:
+    words = str(text or "").split()
+    if len(words) <= max_words:
+        return _clean_text_artifacts(text)
+    return _clean_text_artifacts(" ".join(words[:max_words]))
+
+
+def _sentence_from_bullet(bullet: str) -> str:
+    s = _clean_text_artifacts(bullet)
+    if not s:
+        return ""
+    if s[-1] not in ".!?":
+        s += "."
+    return s
+
+
+def _norm_text_tokens(text: str) -> set[str]:
+    return set(re.findall(r"[A-Za-zА-Яа-яЁё0-9]{3,}", (text or "").lower()))
+
+
+def _overlap_ratio(a: str, b: str) -> float:
+    ta = _norm_text_tokens(a)
+    tb = _norm_text_tokens(b)
+    if not ta or not tb:
+        return 0.0
+    return len(ta & tb) / max(1, min(len(ta), len(tb)))
+
+
+def _dedupe_body_vs_bullets(body: str, bullets: list[str]) -> str:
+    sents = _split_sentences(body)
+    if not sents:
+        return ""
+    uniq: list[str] = []
+    for sent in sents:
+        # Убираем предложения, которые повторяют любой буллет почти теми же словами.
+        if any(_overlap_ratio(sent, b) >= 0.72 for b in bullets):
+            continue
+        # Убираем повторы внутри body.
+        if any(_overlap_ratio(sent, prev) >= 0.78 for prev in uniq):
+            continue
+        uniq.append(sent)
+    return " ".join(uniq).strip()
+
+
+def _synthesize_detailed_body(slide: SlideSpec) -> str:
+    points = [_clean_text_artifacts(b) for b in (slide.bullets or []) if _clean_text_artifacts(b)]
+    if not points:
+        return ""
+    a = points[0] if len(points) > 0 else ""
+    b = points[1] if len(points) > 1 else ""
+    c = points[2] if len(points) > 2 else ""
+    title = _clean_text_artifacts(slide.title).lower()
+    s1 = (
+        f"В этом блоке разбирается, как {a.lower() if a else title} влияет на общий результат команды."
+        if a
+        else f"В этом блоке раскрывается тема «{title}» через практический контекст."
+    )
+    s2 = (
+        f"Отдельный акцент сделан на связи между направлениями «{a}» и «{b}», чтобы показать логику принятия решений."
+        if a and b
+        else "Ключевые тезисы связаны между собой и показывают последовательную логику действий."
+    )
+    s3 = (
+        f"Практическая ценность подхода проявляется в сценариях, где критичны «{b}» и «{c}»."
+        if b and c
+        else "Практическая ценность материала в том, что его можно сразу применять в рабочих сценариях."
+    )
+    return " ".join([_clean_text_artifacts(s1), _clean_text_artifacts(s2), _clean_text_artifacts(s3)]).strip()
+
+
+def _apply_density_to_slides(slides: list[SlideSpec], text_density: TextDensity) -> None:
+    spec = _DENSITY_RULES.get(text_density, _DENSITY_RULES["balanced"])
+    max_bullets = int(spec.get("max_bullets", 5))
+    max_bullet_words = int(spec.get("max_bullet_words", 14))
+    allow_body = bool(spec.get("allow_body", True))
+    rich_kinds = {"content", "two_column", "conclusion"}
+
+    for slide in slides:
+        if slide.kind in ("title", "section", "table"):
+            continue
+
+        # Базовая нормализация bullets.
+        cleaned_bullets = [_clip_words(b, max_bullet_words) for b in slide.bullets if _clean_text_artifacts(b)]
+        slide.bullets = cleaned_bullets[:max_bullets]
+
+        # Нормализация body.
+        body_sentences = _split_sentences(slide.body)
+        if not allow_body:
+            slide.body = ""
+        elif text_density == "balanced":
+            # Balanced: максимум 1 короткое предложение.
+            if body_sentences:
+                slide.body = _clip_words(body_sentences[0], 18)
+                if slide.body and slide.body[-1] not in ".!?":
+                    slide.body += "."
+            else:
+                slide.body = ""
+        elif text_density == "detailed" and slide.kind in rich_kinds:
+            # Detailed: гарантируем 5-8 буллетов И/ИЛИ связный body из 3-6 предложений.
+            min_bullets = 5
+            if len(slide.bullets) < min_bullets and body_sentences:
+                for sent in body_sentences:
+                    cand = _clip_words(sent, max_bullet_words)
+                    if cand and cand not in slide.bullets:
+                        slide.bullets.append(cand)
+                    if len(slide.bullets) >= min_bullets:
+                        break
+                slide.bullets = slide.bullets[:max_bullets]
+
+            # В body оставляем только дополнительный текст, не повторяющий буллеты.
+            deduped_body = _dedupe_body_vs_bullets(slide.body, slide.bullets)
+            cur_body_sent = _split_sentences(deduped_body)
+            if len(cur_body_sent) < 2:
+                synth = _split_sentences(_synthesize_detailed_body(slide))
+                for sent in synth:
+                    if not any(_overlap_ratio(sent, prev) >= 0.82 for prev in cur_body_sent):
+                        cur_body_sent.append(sent)
+            if len(cur_body_sent) > 6:
+                cur_body_sent = cur_body_sent[:6]
+            slide.body = " ".join(cur_body_sent).strip()
+
+        # Minimal: body уже выключен, bullets ограничены выше.
+
+
 def _coerce_slide(d: dict[str, Any], idx: int, total: int) -> SlideSpec:
     raw_kind = str(d.get("kind") or d.get("type") or "")
     kind = _normalize_kind(raw_kind, idx, total)
 
     bullets_raw = d.get("bullets") or d.get("points") or []
     if isinstance(bullets_raw, str):
-        bullets = [b.strip(" -•\t") for b in bullets_raw.splitlines() if b.strip()]
+        bullets = [_clean_text_artifacts(b) for b in bullets_raw.splitlines() if b.strip()]
     else:
-        bullets = [str(b).strip(" -•\t") for b in bullets_raw if str(b).strip()]
+        bullets = [_clean_text_artifacts(str(b)) for b in bullets_raw if str(b).strip()]
+    bullets = [b for b in bullets if b]
 
     headers, rows = _coerce_table(d)
 
@@ -336,12 +497,18 @@ def _coerce_slide(d: dict[str, Any], idx: int, total: int) -> SlideSpec:
     if placing not in ("left", "right"):
         placing = "right"
 
+    body_raw = str(d.get("body", "")).strip()
+    if "•" in body_raw or "\u2022" in body_raw:
+        body = _body_from_bulletish_text(body_raw)
+    else:
+        body = _clean_text_artifacts(body_raw)
+
     return SlideSpec(
         kind=kind,
-        title=str(d.get("title", "")).strip() or f"Слайд {idx + 1}",
-        subtitle=str(d.get("subtitle", "")).strip(),
+        title=_clean_text_artifacts(str(d.get("title", ""))) or f"Слайд {idx + 1}",
+        subtitle=_clean_text_artifacts(str(d.get("subtitle", ""))),
         bullets=bullets,
-        body=str(d.get("body", "")).strip(),
+        body=body,
         image_prompt=str(d.get("image_prompt", "")).strip(),
         image_data_url=str(d.get("image_data_url", "")).strip(),
         notes=str(d.get("notes", "")).strip(),
@@ -410,7 +577,13 @@ async def _self_check_plan(
 6) СТРУКТУРА — сохрани тот же набор и порядок kind у слайдов и общее их количество.
 7) ЯЗЫК — {language}.
 8) Поля image_prompt и image_data_url НЕ меняй (оставь как есть).
-9) ТАБЛИЦЫ (kind="table"). Проверь поля headers и rows:
+9) РЕЖИМ ПЛОТНОСТИ обязателен:
+   - minimal: до 3 буллетов, body пустой;
+   - balanced: 3–5 буллетов, body максимум 1 короткое предложение;
+   - detailed: для content/two_column/conclusion делай 5–8 буллетов и body 3–6 предложений.
+10) УБЕРИ форматные маркеры «•», «-», «*» из title/subtitle/body; body должен быть связным текстом.
+11) Body на каждом слайде не повторяет буллеты дословно: оставь только дополнительное пояснение/вывод.
+12) ТАБЛИЦЫ (kind="table"). Проверь поля headers и rows:
    - все строки rows имеют ту же длину, что и headers;
    - в ячейках нет выдуманных конкретных чисел/дат/имён, в которых ты не уверен — замени на «—» или обобщение;
    - не должно быть пустых столбцов и полностью пустых строк;
@@ -545,6 +718,7 @@ async def plan_presentation(
         slides_raw = data.get("slides") or slides_raw
 
     slides = [_coerce_slide(s, i, len(slides_raw)) for i, s in enumerate(slides_raw)]
+    _apply_density_to_slides(slides, text_density)
 
     if images_mode == "no-images":
         for s in slides:
@@ -633,6 +807,8 @@ def _build_sample_prompt(
 - ФАКТЫ: если не уверен в конкретной цифре/дате/имени — не пиши её, давай обобщение.
 - Не повторяйся между слайдами и не противоречь сам себе.
 - Заголовки — короткие (до 60 символов), без точки в конце.
+- Не используй маркеры «•», «-», «*» внутри body/subtitle/title; body должен быть обычным абзацем.
+- Body должен дополнять буллеты (объяснение/пример/вывод), а не дублировать их теми же словами.
 - ТАБЛИЦА: если тема нуждается в сравнении/спецификации/тарифе/расписании/статистике, добавь
   1–2 слайда kind="table" с headers (2–5 шт.) и rows (2–7 шт.); ячейки короткие, без выдуманных
   чисел (лучше пусто, чем неправда).
@@ -722,6 +898,7 @@ async def plan_presentation_from_sample(
         slides_raw = data.get("slides") or slides_raw
 
     slides = [_coerce_slide(s, i, len(slides_raw)) for i, s in enumerate(slides_raw)]
+    _apply_density_to_slides(slides, effective_density)
 
     if images_mode == "no-images":
         for s in slides:
