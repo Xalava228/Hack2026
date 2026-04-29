@@ -18,7 +18,7 @@ from pptx.util import Emu
 
 logger = logging.getLogger(__name__)
 
-SourceFormat = Literal["pptx", "pdf"]
+SourceFormat = Literal["pptx", "pdf", "docx"]
 
 
 @dataclass
@@ -384,6 +384,217 @@ def analyze_pdf(path: Path, sample_id: str) -> SampleAnalysis:
     )
 
 
+def _is_heading_style(style_name: str) -> bool:
+    n = (style_name or "").strip().lower()
+    if not n:
+        return False
+    if "heading" in n or "заголовок" in n:
+        return True
+    if n in ("title", "название", "subtitle"):
+        return True
+    return False
+
+
+def _paragraphs_from_docx_tables(doc) -> list[tuple[str, str]]:
+    """Параграфы и строки таблиц в порядке следования в документе."""
+    from docx.oxml.ns import qn
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    rows: list[tuple[str, str]] = []
+    for block in doc.element.body:
+        if block.tag == qn("w:tbl"):
+            table = Table(block, doc)
+            for row in table.rows:
+                cells = [c.text.strip() for c in row.cells]
+                line = " | ".join(c for c in cells if c)
+                if line:
+                    rows.append(("p", line))
+        elif block.tag == qn("w:p"):
+            para = Paragraph(block, doc)
+            t = para.text.strip()
+            if not t:
+                continue
+            st = para.style.name if para.style else ""
+            kind = "h" if _is_heading_style(st) else "p"
+            rows.append((kind, t))
+    return rows
+
+
+def _blocks_from_docx(doc) -> list[tuple[str, str]]:
+    """Параграфы и таблицы в порядке следования в документе."""
+    try:
+        return _paragraphs_from_docx_tables(doc)
+    except Exception:
+        logger.exception("docx: fallback to paragraphs only")
+        out: list[tuple[str, str]] = []
+        for para in doc.paragraphs:
+            t = para.text.strip()
+            if not t:
+                continue
+            st = para.style.name if para.style else ""
+            kind = "h" if _is_heading_style(st) else "p"
+            out.append((kind, t))
+        return out
+
+
+def _docx_section_to_slide(section_title: str, paras: list[str]) -> SampleSlideInfo:
+    title = section_title.strip()
+    body_paras = list(paras)
+    if not title and body_paras:
+        first = body_paras[0].strip()
+        if len(first) <= 120:
+            title = first[:200]
+            body_paras = body_paras[1:]
+        else:
+            title = "Введение"
+    if not title:
+        title = "Раздел"
+    body_join = " ".join(body_paras).strip()
+    bullets = [p[:200] for p in body_paras[:12] if len(p.split()) <= 40]
+    return SampleSlideInfo(
+        title=title[:200],
+        bullets=bullets[:10],
+        body=body_join[:1200],
+        word_count=len((title + " " + body_join).split()),
+        has_image=False,
+    )
+
+
+def _extract_docx_paragraphs_zip(path: Path) -> list[str]:
+    """Извлекает текст абзацев из DOCX без python-docx (только стандартная библиотека).
+
+    Уступает python-docx в распознавании стилей заголовков и части разметки,
+    но позволяет разбирать файл, если пакет не установлен в окружении сервера.
+    """
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    q = lambda tag: f"{{{ns}}}{tag}"
+
+    try:
+        with zipfile.ZipFile(path) as z:
+            xml_bytes = z.read("word/document.xml")
+    except KeyError as e:
+        raise ValueError("DOCX без word/document.xml") from e
+    except zipfile.BadZipFile as e:
+        raise ValueError("Файл не похож на корректный DOCX (ZIP)") from e
+
+    root = ET.fromstring(xml_bytes)
+    out: list[str] = []
+    for p_el in root.iter(q("p")):
+        parts: list[str] = []
+        for node in p_el.iter(q("t")):
+            if node.text:
+                parts.append(node.text)
+            if node.tail:
+                parts.append(node.tail)
+        line = "".join(parts).strip()
+        if line:
+            out.append(line)
+    return out
+
+
+def _chunk_plain_paragraphs(paragraphs: list[str], target_words: int = 320) -> list[str]:
+    """Разбивает сплошной текст на куски по ~target_words слов."""
+    chunks: list[str] = []
+    current: list[str] = []
+    wc = 0
+    for line in paragraphs:
+        line_w = len(line.split())
+        if wc + line_w > target_words and current:
+            chunks.append("\n".join(current))
+            current = [line]
+            wc = line_w
+        else:
+            current.append(line)
+            wc += line_w
+    if current:
+        chunks.append("\n".join(current))
+    return chunks
+
+
+def analyze_docx(path: Path, sample_id: str) -> SampleAnalysis:
+    blocks: list[tuple[str, str]]
+    try:
+        from docx import Document
+
+        doc = Document(str(path))
+        blocks = _blocks_from_docx(doc)
+    except ImportError:
+        logger.warning(
+            "Пакет python-docx не найден; для DOCX используется упрощённое извлечение текста. "
+            "Рекомендуется: pip install python-docx"
+        )
+        plain = _extract_docx_paragraphs_zip(path)
+        blocks = [("p", t) for t in plain]
+
+    heading_count = sum(1 for k, _ in blocks if k == "h")
+    slides: list[SampleSlideInfo] = []
+
+    if heading_count > 0:
+        cur_title = ""
+        cur_paras: list[str] = []
+        for kind, text in blocks:
+            if kind == "h":
+                if cur_title or cur_paras:
+                    slides.append(_docx_section_to_slide(cur_title, cur_paras))
+                cur_title = text
+                cur_paras = []
+            else:
+                cur_paras.append(text)
+        if cur_title or cur_paras:
+            slides.append(_docx_section_to_slide(cur_title, cur_paras))
+    else:
+        paras = [t for k, t in blocks if t.strip()]
+        if not paras:
+            slides.append(
+                SampleSlideInfo(
+                    title="Документ",
+                    bullets=[],
+                    body="",
+                    word_count=0,
+                    has_image=False,
+                )
+            )
+        else:
+            for i, chunk in enumerate(_chunk_plain_paragraphs(paras)):
+                lines = [ln.strip() for ln in chunk.split("\n") if ln.strip()]
+                title_g = lines[0][:120] if lines and len(lines[0]) <= 100 else f"Фрагмент {i + 1}"
+                rest = lines[1:] if len(lines) > 1 and len(lines[0]) <= 100 else lines
+                body = " ".join(rest).strip()[:1200]
+                bullets = [ln[:200] for ln in rest[:10] if len(ln.split()) <= 35]
+                info = SampleSlideInfo(
+                    title=title_g,
+                    bullets=bullets,
+                    body=body,
+                    word_count=len(chunk.split()),
+                    has_image=False,
+                )
+                slides.append(info)
+
+    n = len(slides) or 1
+    for i, info in enumerate(slides):
+        info.kind_guess = _guess_kind(i, n, info)
+
+    avg_words = sum(s.word_count for s in slides) / max(1, n)
+    density = _density_from_words(avg_words)
+    title_guess = slides[0].title if slides else ""
+
+    return SampleAnalysis(
+        sample_id=sample_id,
+        source_format="docx",
+        file_name=path.name,
+        n_slides=n,
+        palette=dict(_DEFAULT_PALETTE),
+        density=density,
+        has_images=False,
+        slides=slides,
+        title_guess=title_guess,
+    )
+
+
 # ============================ entry ============================
 def analyze_file(path: Path, sample_id: str) -> SampleAnalysis:
     suffix = path.suffix.lower()
@@ -391,12 +602,20 @@ def analyze_file(path: Path, sample_id: str) -> SampleAnalysis:
         return analyze_pptx(path, sample_id)
     if suffix == ".pdf":
         return analyze_pdf(path, sample_id)
-    raise ValueError(f"Неподдерживаемый формат: {suffix}. Используйте .pptx или .pdf")
+    if suffix == ".docx":
+        return analyze_docx(path, sample_id)
+    raise ValueError(f"Неподдерживаемый формат: {suffix}. Используйте .pptx, .pdf или .docx")
 
 
 def sample_outline_for_llm(sample: SampleAnalysis, max_chars: int = 4000) -> str:
     """Готовим компактный JSON-блок для подсказки LLM."""
+    is_doc = sample.source_format == "docx"
+    if is_doc:
+        max_chars = max(max_chars, 12000)
+    body_limit = 520 if is_doc else 240
+    max_bullets = 10 if is_doc else 6
     payload = {
+        "source": sample.source_format,
         "n_slides": sample.n_slides,
         "density": sample.density,
         "palette": sample.palette,
@@ -406,8 +625,8 @@ def sample_outline_for_llm(sample: SampleAnalysis, max_chars: int = 4000) -> str
             {
                 "kind": s.kind_guess,
                 "title": s.title[:90],
-                "bullets": [b[:120] for b in s.bullets[:6]],
-                "body": s.body[:240],
+                "bullets": [b[:160] for b in s.bullets[:max_bullets]],
+                "body": s.body[:body_limit],
             }
             for s in sample.slides
         ],
@@ -415,13 +634,27 @@ def sample_outline_for_llm(sample: SampleAnalysis, max_chars: int = 4000) -> str
     text = json.dumps(payload, ensure_ascii=False)
     if len(text) > max_chars:
         compact = {
+            "source": sample.source_format,
             "n_slides": sample.n_slides,
             "density": sample.density,
             "palette": sample.palette,
             "has_images": sample.has_images,
             "title_guess": sample.title_guess,
             "slides": [
-                {"kind": s.kind_guess, "title": s.title[:80]}
+                {"kind": s.kind_guess, "title": s.title[:80], "body": s.body[:280]}
+                for s in sample.slides
+            ],
+        }
+        text = json.dumps(compact, ensure_ascii=False)
+    if len(text) > max_chars:
+        compact = {
+            "source": sample.source_format,
+            "n_slides": sample.n_slides,
+            "density": sample.density,
+            "palette": sample.palette,
+            "title_guess": sample.title_guess[:120],
+            "slides": [
+                {"kind": s.kind_guess, "title": s.title[:70]}
                 for s in sample.slides
             ],
         }

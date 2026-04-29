@@ -328,7 +328,7 @@ class AIClient:
         url = "https://commons.wikimedia.org/w/api.php"
         try:
             async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as cli:
-                r = await cli.get(url, params=params, headers={"User-Agent": "SlideForge/1.0"})
+                r = await cli.get(url, params=params, headers={"User-Agent": "BPK-IT/3.0"})
             if r.status_code != 200:
                 return []
             data = r.json()
@@ -403,7 +403,7 @@ class AIClient:
         url = "https://api.openverse.org/v1/images/"
         try:
             async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as cli:
-                r = await cli.get(url, params=params, headers={"User-Agent": "SlideForge/1.0"})
+                r = await cli.get(url, params=params, headers={"User-Agent": "BPK-IT/3.0"})
             if r.status_code == 401:
                 logger.warning("Openverse returned 401, skipping this source.")
                 return []
@@ -454,7 +454,7 @@ class AIClient:
         async def _fetch_one(cli: httpx.AsyncClient, url: str) -> bytes | None:
             async with sem:
                 try:
-                    r = await cli.get(url, headers={"User-Agent": "SlideForge/1.0"})
+                    r = await cli.get(url, headers={"User-Agent": "BPK-IT/3.0"})
                     ctype = r.headers.get("content-type", "")
                     final_url = str(r.url)
                     if "defaultImage.small" in final_url:

@@ -741,6 +741,87 @@ async def plan_presentation(
     )
 
 
+def _build_document_prompt(
+    user_prompt: str,
+    sample: SampleAnalysis,
+    n_slides: int,
+    images_mode: ImagesMode,
+    language: str,
+    text_density: TextDensity | None = None,
+    *,
+    preset_label: str = "",
+    web_context: str = "",
+) -> str:
+    """Промпт для презентации по содержанию загруженного DOCX (не «стиль образца»)."""
+    images_hint = (
+        "Для каждого контентного слайда придумай поле image_prompt — короткое описание "
+        "иллюстрации на английском языке (без текста на изображении), подходящей по смыслу."
+        if images_mode in ("with-images", "internet-images")
+        else "Поле image_prompt оставляй пустой строкой."
+    )
+    density_label: TextDensity = text_density or sample.density  # type: ignore[assignment]
+    if density_label not in _DENSITY_RULES:
+        density_label = "balanced"
+    density_block = _density_block(density_label)
+
+    sample_json = sample_outline_for_llm(sample)
+
+    schema = {
+        "title": "string",
+        "subtitle": "string",
+        "theme": "string",
+        "palette": {
+            "primary": "#RRGGBB",
+            "accent": "#RRGGBB",
+            "background": "#RRGGBB",
+            "text": "#RRGGBB",
+            "muted": "#RRGGBB",
+        },
+        "slides": [
+            {
+                "kind": "title|content|two_column|section|conclusion|table",
+                "title": "string",
+                "subtitle": "string (опционально)",
+                "bullets": ["string", "..."],
+                "body": "string (опционально)",
+                "image_prompt": "string",
+                "notes": "string (опционально)",
+                "headers": ["string (только для kind=table)"],
+                "rows": [["string", "..."]],
+            }
+        ],
+    }
+
+    return f"""Ниже — разбор загруженного документа (DOCX): фрагменты текста и заголовки.
+Составь презентацию, которая передаёт СОДЕРЖАНИЕ этого документа: основные тезисы, логику изложения и выводы.
+
+Документ (JSON):
+{sample_json}
+
+Правила содержания:
+- Опирайся на текст документа; не выдумывай конкретные цифры, даты, имена и факты, если их нет во фрагментах.
+- Если чего-то не хватает — формулируй осторожно («возможно», «в целом») или опускай деталь.
+- Дополнительные указания пользователя (акценты, аудитория, что усилить или сократить): «{user_prompt}»
+{web_context if web_context else ""}
+
+{density_block}
+
+Структура и объём:
+- Ровно {n_slides} слайдов; первая — title/cover по сути документа, последняя — conclusion с итогами из текста.
+- Язык контента — {language}.
+- Заголовки слайдов — короткие (до 60 символов), без точки в конце.
+- Не используй маркеры «•», «-», «*» внутри body/subtitle/title; body — связный абзац там, где нужно пояснение.
+- ТАБЛИЦА: если в документе есть сравнимые списки/табличные данные, можно 1 слайд kind="table"; не придумывай ячейки.
+
+Цвета: на базе palette из JSON документа (или гармонично скорректируй). Визуальный пресет экспорта: {preset_label or "по умолчанию"}
+
+{images_hint}
+
+Верни СТРОГО валидный JSON без markdown-обёртки следующей формы:
+{json.dumps(schema, ensure_ascii=False, indent=2)}
+"""
+
+
 def _build_sample_prompt(
     user_prompt: str,
     sample: SampleAnalysis,
@@ -752,6 +833,18 @@ def _build_sample_prompt(
     preset_label: str = "",
     web_context: str = "",
 ) -> str:
+    if sample.source_format == "docx":
+        return _build_document_prompt(
+            user_prompt=user_prompt,
+            sample=sample,
+            n_slides=n_slides,
+            images_mode=images_mode,
+            language=language,
+            text_density=text_density,
+            preset_label=preset_label,
+            web_context=web_context,
+        )
+
     images_hint = (
         "Для каждого контентного слайда придумай поле image_prompt — короткое описание "
         "иллюстрации на английском языке (без текста на изображении), подходящей по смыслу."

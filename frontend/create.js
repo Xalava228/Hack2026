@@ -8,7 +8,6 @@
   const sampleClearBtn = document.getElementById('sample-clear');
   const sampleStatusEl = document.getElementById('sample-status');
   const suggestionsEl = document.getElementById('suggestion-grid');
-  const shuffleBtn = document.getElementById('shuffle-btn');
 
   window.SF.setupSeg();
 
@@ -69,8 +68,8 @@
 
   async function uploadSample(file) {
     if (!file) return;
-    if (!/\.(pptx|pdf)$/i.test(file.name)) {
-      setSampleStatus('Поддерживаются только файлы .pptx и .pdf', true);
+    if (!/\.(pptx|pdf|docx)$/i.test(file.name)) {
+      setSampleStatus('Поддерживаются только файлы .pptx, .pdf и .docx', true);
       return;
     }
     if (file.size > 30 * 1024 * 1024) {
@@ -85,7 +84,14 @@
       if (!resp.ok) throw new Error(await resp.text());
       const data = await resp.json();
       currentSample = data;
-      setSampleStatus(`Образец подключен: ${data.file_name}, ${data.n_slides} слайдов.`, false);
+      if (data.source_format === 'docx') {
+        setSampleStatus(
+          `Документ загружен: ${data.file_name}, ${data.n_slides} фрагмент(ов) для генерации.`,
+          false,
+        );
+      } else {
+        setSampleStatus(`Образец подключен: ${data.file_name}, ${data.n_slides} слайдов.`, false);
+      }
     } catch (e) {
       currentSample = null;
       setSampleStatus(e.message || String(e), true);
@@ -107,7 +113,6 @@
 
   sampleFileEl.addEventListener('change', (e) => uploadSample(e.target.files?.[0]));
   sampleClearBtn.addEventListener('click', clearSample);
-  shuffleBtn.addEventListener('click', renderSuggestions);
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

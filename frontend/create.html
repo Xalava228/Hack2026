@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SlideForge Studio - Создание</title>
+  <title>БПК-IT_ver.3.0 - Создание</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -12,7 +12,7 @@
 <body class="rt-page">
   <header class="rt-header">
     <div class="rt-wrap rt-topline">
-      <div class="brand"><span class="brand-mark"></span><span>SlideForge Studio</span></div>
+      <div class="brand"><span class="brand-mark"></span><span>БПК-IT_ver.3.0</span></div>
       <nav class="top-nav">
         <a href="/">Главная</a>
         <a href="/create.html">Создание</a>
@@ -113,9 +113,9 @@
         </label>
 
         <div id="sample" class="field full">
-          <span class="lbl">Опционально: взять стиль из образца (PPTX/PDF)</span>
+          <span class="lbl">Опционально: образец стиля (PPTX/PDF) или документ для презентации (DOCX)</span>
           <div class="sample-wrap">
-            <input type="file" id="sample-file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+            <input type="file" id="sample-file" accept=".pptx,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
             <div class="sample-actions">
               <button type="button" class="btn btn-secondary" id="sample-clear">Очистить образец</button>
             </div>
@@ -130,7 +130,6 @@
 
         <div class="actions full">
           <button class="btn btn-primary" id="build-plan-btn" type="submit">Собрать черновик и перейти в редактор</button>
-          <button class="btn btn-secondary" id="shuffle-btn" type="button">Shuffle</button>
           <p class="hint" id="form-hint">После генерации откроется отдельная страница редактора.</p>
         </div>
       </form>

@@ -54,7 +54,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
-app = FastAPI(title="AI Presentation Generator", version="1.0.0")
+app = FastAPI(title="БПК-IT_ver.3.0", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -108,7 +108,7 @@ class WebImagesRequest(BaseModel):
     aspect: str = Field("16:9", pattern="^(16:9|1:1)$")
 
 
-_ALLOWED_SUFFIX = {".pptx", ".pdf"}
+_ALLOWED_SUFFIX = {".pptx", ".pdf", ".docx"}
 _MAX_UPLOAD_BYTES = 30 * 1024 * 1024  # 30 MB
 
 
@@ -120,7 +120,7 @@ async def api_analyze(file: UploadFile = File(...)):
     if suffix not in _ALLOWED_SUFFIX:
         raise HTTPException(
             status_code=400,
-            detail="Поддерживаются только файлы .pptx и .pdf",
+            detail="Поддерживаются только файлы .pptx, .pdf и .docx",
         )
 
     sample_id = uuid.uuid4().hex[:12]

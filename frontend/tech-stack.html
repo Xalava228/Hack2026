@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Схема стека · БПК-IT_ver.3.0</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --text: #1d2433;
+      --muted: #5f6776;
+      --border: #e7e9ee;
+      --accent: #7423ff;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Manrope", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .wrap {
+      width: min(1100px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+    }
+    .lead {
+      color: var(--muted);
+      margin: 0 0 24px;
+      max-width: 720px;
+    }
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+    .back:hover { text-decoration: underline; }
+    .section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 20px 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 24px rgba(24, 34, 59, 0.06);
+    }
+    .section h2 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 16px;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      text-align: center;
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-weight: 600; }
+    code {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      background: #f2f3f7;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">← На главную</a>
+    <h1>Схема стека технологий</h1>
+    <p class="lead">
+      Архитектура приложения БПК-IT_ver.3.0: клиент, API, пайплайн генерации,
+      внешний AI (<code>ai.rt.ru</code>) и библиотеки сборки файлов.
+    </p>
+
+    <div class="section">
+      <h2>Поток данных</h2>
+      <div class="mermaid">
+flowchart TB
+  subgraph Client["Браузер"]
+    FE["HTML / CSS / Vanilla JS\n(create · editor · export · shared)"]
+  end
+  subgraph API["FastAPI · Uvicorn"]
+    R1["/api/plan · /api/generate · /api/render"]
+    R2["/api/analyze · загрузки"]
+    R3["Статика frontend/"]
+  end
+  subgraph Core["Python backend"]
+    ORC["orchestrator:\nплан → картинки → PPTX/PDF"]
+    SP["slide_planner · ai_client"]
+    SA["sample_analyzer\n(pptx · pdf · docx)"]
+    PB["pptx_builder · pdf_builder"]
+  end
+  subgraph Ext["Внешние сервисы ai.rt.ru"]
+    LLM["LLM /llama/chat\n(Qwen по умолчанию)"]
+    YA["Yandex ART /ya/image"]
+    SD["Stable Diffusion /sd/img"]
+    WEB["Поиск картинок / интернет"]
+  end
+  subgraph FS["Файловая система"]
+    UP["uploads/"]
+    OUT["generated/"]
+  end
+  FE --> R1
+  FE --> R2
+  R1 --> ORC
+  R2 --> SA
+  ORC --> SP
+  ORC --> PB
+  SP --> LLM
+  ORC --> YA
+  ORC --> SD
+  ORC --> WEB
+  SA --> UP
+  PB --> OUT
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Слои стека</h2>
+      <div class="mermaid">
+flowchart LR
+  subgraph L1["Клиент"]
+    A1["Fetch API"]
+    A2["sessionStorage"]
+    A3["Google Fonts Manrope"]
+  end
+  subgraph L2["Сервер приложения"]
+    B1["FastAPI"]
+    B2["Pydantic"]
+    B3["Starlette static"]
+    B4["python-multipart"]
+  end
+  subgraph L3["ИИ и HTTP"]
+    C1["httpx async"]
+    C2["ai.rt.ru Bearer token"]
+  end
+  subgraph L4["Документы и рендер"]
+    D1["python-pptx"]
+    D2["ReportLab"]
+    D3["Pillow"]
+    D4["pypdf · python-docx"]
+  end
+  L1 --> L2
+  L2 --> L3
+  L2 --> L4
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Зависимости Python (requirements.txt)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Пакет</th>
+            <th>Назначение</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>fastapi</code></td><td>HTTP API, модели запросов</td></tr>
+          <tr><td><code>uvicorn</code></td><td>ASGI-сервер</td></tr>
+          <tr><td><code>httpx</code></td><td>Асинхронные вызовы AI API</td></tr>
+          <tr><td><code>pydantic</code></td><td>Валидация тел запросов</td></tr>
+          <tr><td><code>python-multipart</code></td><td>Загрузка файлов</td></tr>
+          <tr><td><code>python-pptx</code></td><td>Сборка PPTX (и разбор образца)</td></tr>
+          <tr><td><code>reportlab</code></td><td>Сборка PDF слайдов</td></tr>
+          <tr><td><code>Pillow</code></td><td>Обработка изображений в PDF</td></tr>
+          <tr><td><code>pypdf</code></td><td>Разбор PDF-образца</td></tr>
+          <tr><td><code>python-docx</code></td><td>Разбор DOCX (при отсутствии — fallback через ZIP/XML)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Конфигурация AI (переменные окружения)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Переменная</th>
+            <th>Описание</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>AI_TOKEN</code></td><td>Bearer-токен для <code>ai.rt.ru</code></td></tr>
+          <tr><td><code>AI_BASE_URL</code></td><td>Базовый URL API (по умолчанию <code>https://ai.rt.ru/api/1.0</code>)</td></tr>
+          <tr><td><code>LLM_MODEL</code></td><td>Идентификатор текстовой модели (по умолчанию <code>Qwen/Qwen2.5-72B-Instruct</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      securityLevel: "loose",
+      themeVariables: {
+        primaryColor: "#e8e0ff",
+        primaryTextColor: "#1d2433",
+        primaryBorderColor: "#7423ff",
+        lineColor: "#5f6776",
+        secondaryColor: "#f2f3f7",
+        tertiaryColor: "#ffffff",
+        fontFamily: "Manrope, system-ui, sans-serif",
+      },
+    });
+  </script>
+</body>
+</html>
